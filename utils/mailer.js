@@ -1,46 +1,24 @@
 // utils/mailer.js
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 require('dotenv').config();
 
-// Create transporter from env with better error handling
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: Number(process.env.SMTP_PORT || 465),
-  secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : true,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  // Additional settings for better reliability
-  pool: true,
-  maxConnections: 5,
-  maxMessages: 100,
-  rateDelta: 1000,
-  rateLimit: 5,
-});
+// Initialize Resend with API key
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Verify transport on startup with detailed logging and safe error handling
-transporter.verify().then(() => {
-  console.log('✉️  Mailer ready - SMTP connection verified');
-  console.log('📧 SMTP Config:', {
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: Number(process.env.SMTP_PORT || 465),
-    user: process.env.SMTP_USER ? '***@' + (process.env.SMTP_USER.includes('@') ? process.env.SMTP_USER.split('@')[1] : 'unknown') : 'NOT_SET',
-    secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : true
-  });
-}).catch((e) => {
-  console.error('❌ Mailer verification failed:', e.message);
-  console.error('🔍 Check these environment variables on Railway:');
-  console.error('   - SMTP_HOST (default: smtp.gmail.com)');
-  console.error('   - SMTP_PORT (default: 465)');
-  console.error('   - SMTP_USER (your email address)');
-  console.error('   - SMTP_PASS (Gmail App Password, not regular password)');
-  console.error('   - MAIL_FROM_EMAIL (optional, defaults to SMTP_USER)');
-  console.error('   - MAIL_FROM_NAME (optional, defaults to "Netanix Portal")');
-});
-
-const FROM_EMAIL = process.env.MAIL_FROM_EMAIL || process.env.SMTP_USER;
+const FROM_EMAIL = process.env.MAIL_FROM_EMAIL || 'onboarding@resend.dev';
 const FROM_NAME = process.env.MAIL_FROM_NAME || 'Netanix Portal';
+
+// Verify Resend configuration on startup
+if (!process.env.RESEND_API_KEY) {
+  console.error('❌ RESEND_API_KEY not configured');
+  console.error('🔍 Set RESEND_API_KEY environment variable on Railway');
+} else {
+  console.log('✉️  Resend mailer initialized');
+  console.log('📧 Email Config:', {
+    from: `${FROM_NAME} <${FROM_EMAIL}>`,
+    apiKey: process.env.RESEND_API_KEY ? '***' + process.env.RESEND_API_KEY.slice(-4) : 'NOT_SET'
+  });
+}
 
 function buildBaseEmail({ title, bodyHtml }) {
   return `
@@ -59,8 +37,8 @@ function buildBaseEmail({ title, bodyHtml }) {
 async function sendResetOtpEmail(to, otp) {
   try {
     // Validate required environment variables
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      throw new Error('SMTP credentials not configured. Set SMTP_USER and SMTP_PASS environment variables.');
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error('RESEND_API_KEY not configured. Set RESEND_API_KEY environment variable.');
     }
 
     const html = buildBaseEmail({
@@ -73,14 +51,15 @@ async function sendResetOtpEmail(to, otp) {
       `,
     });
 
-    const result = await transporter.sendMail({
+    const result = await resend.emails.send({
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
-      to,
+      to: [to],
       subject: 'Your OTP for Password Reset',
       html,
     });
 
     console.log('✅ OTP email sent successfully to:', to);
+    console.log('📧 Resend response:', result);
     return result;
   } catch (error) {
     console.error('❌ Failed to send OTP email:', error.message);
@@ -90,9 +69,9 @@ async function sendResetOtpEmail(to, otp) {
 
 async function sendWelcomeEmail(to, name) {
   try {
-    // Skip welcome email if SMTP not configured (non-critical)
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      console.warn('⚠️  Skipping welcome email - SMTP not configured');
+    // Skip welcome email if Resend not configured (non-critical)
+    if (!process.env.RESEND_API_KEY) {
+      console.warn('⚠️  Skipping welcome email - RESEND_API_KEY not configured');
       return null;
     }
 
@@ -105,14 +84,15 @@ async function sendWelcomeEmail(to, name) {
       `,
     });
 
-    const result = await transporter.sendMail({
+    const result = await resend.emails.send({
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
-      to,
+      to: [to],
       subject: 'Welcome to Netanix CTF',
       html,
     });
 
     console.log('✅ Welcome email sent successfully to:', to);
+    console.log('📧 Resend response:', result);
     return result;
   } catch (error) {
     console.error('❌ Failed to send welcome email:', error.message);
@@ -122,7 +102,7 @@ async function sendWelcomeEmail(to, name) {
 }
 
 module.exports = {
-  transporter,
+  resend,
   buildBaseEmail,
   sendResetOtpEmail,
   sendWelcomeEmail,
