@@ -87,7 +87,7 @@ const startServer = async () => {
     initializeModels();
 
     // 🚨 TEMP PATCH: sync models to DB in Railway (adds missing columns)
-    await sequelize.sync({ alter: true })
+    await sequelize.sync({ alter: false })
       .then(() => console.log('✅ Sequelize: DB schema synced (alter)'))
       .catch(err => console.error('❌ Sequelize sync failed:', err));
 
