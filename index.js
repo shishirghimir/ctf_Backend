@@ -14,7 +14,9 @@ const { initializeModels } = require('./model/index');
 if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
 
 // Security & parsing
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" } // allow API JSON cross-origin
+}));
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
 
@@ -22,21 +24,18 @@ app.use(express.json({ limit: '1mb' }));
 const allowedOrigins = [
   process.env.CLIENT_ORIGIN,
   process.env.CLIENT_ORIGIN?.replace(/\/$/, ''), // Remove trailing slash if present
-  'http://localhost:5173',
-  'http://localhost:5174', // Allow both ports for development
-  'http://localhost:3000'  // Common React dev port
-].filter(Boolean); // Remove undefined values
+  'https://ctfbackend-production.up.railway.app', // Allow Railway backend URL
+  'http://localhost:5173',  // Common React dev port
+].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Debug logging for production troubleshooting
     console.log('🔍 CORS Debug - Origin received:', origin);
     console.log('🔍 CORS Debug - CLIENT_ORIGIN env:', process.env.CLIENT_ORIGIN);
     console.log('🔍 CORS Debug - Allowed origins:', allowedOrigins);
-    
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
+
+    if (!origin) return callback(null, true); // allow no-origin (curl/Postman)
+
     if (allowedOrigins.indexOf(origin) !== -1) {
       console.log('✅ CORS - Origin allowed:', origin);
       callback(null, true);
@@ -46,7 +45,7 @@ app.use(cors({
     }
   },
   credentials: true,
-  optionsSuccessStatus: 200, // For legacy browser support
+  optionsSuccessStatus: 200,
 }));
 
 // Static
@@ -86,7 +85,12 @@ const startServer = async () => {
 
     await connectDB();
     initializeModels();
-    
+
+    // 🚨 TEMP PATCH: sync models to DB in Railway (adds missing columns)
+    await sequelize.sync({ alter: true })
+      .then(() => console.log('✅ Sequelize: DB schema synced (alter)'))
+      .catch(err => console.error('❌ Sequelize sync failed:', err));
+
     app.listen(PORT, () => {
       console.log(`🚀 Netanix CTF Server running at http://localhost:${PORT}`);
       console.log(`📊 Admin Panel: http://localhost:${PORT}/api/ctf/`);
