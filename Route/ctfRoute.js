@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
-const upload = require('../middleware/multerConfig');
+const { upload } = require('../middleware/multerConfig');
 const verifyToken = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/auth');
 
