@@ -1,120 +1,129 @@
+// index.js
 require('dotenv').config();
 
 const express = require('express');
-const path = require('path');
-const fs = require('fs');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT || 5000);
 
-// --- DB setup (keep your own db logic here) ---
+// DB
 const { sequelize, connectDB } = require('./db/database');
 const { initializeModels } = require('./model/index');
 
-// --- Multer upload middleware ---
+// Multer config (uses Railway Volume if UPLOAD_DIR is set)
 const { upload, UPLOAD_DIR } = require('./middleware/multerConfig');
 
-// === Security & parsing ===
+// ---------- Security & parsing ----------
 app.use(helmet());
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
 
-// --- CORS config ---
+// ---------- CORS with credentials ----------
 const allowedOrigins = [
   process.env.CLIENT_ORIGIN,
-  process.env.CLIENT_ORIGIN?.replace(/\/$/, ''), // remove trailing slash
-  'https://ctfbackend-production.up.railway.app',
-  'http://localhost:5173'
+  process.env.CLIENT_ORIGIN?.replace(/\/$/, ''), // Remove trailing slash if present
+  'https://ctfbackend-production.up.railway.app', // Railway backend URL
+  'http://localhost:5173', // Common React dev port
 ].filter(Boolean);
 
 app.use(cors({
-  origin(origin, callback) {
-    // Allow curl / Postman (no origin)
+  origin: function (origin, callback) {
+    // Debug logging for production troubleshooting
+    console.log('🔍 CORS Debug - Origin received:', origin);
+    console.log('🔍 CORS Debug - CLIENT_ORIGIN env:', process.env.CLIENT_ORIGIN);
+    console.log('🔍 CORS Debug - Allowed origins:', allowedOrigins);
+
+    // Allow requests with no origin (mobile apps, curl, server-to-server)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log('✅ CORS - Origin allowed:', origin);
+      callback(null, true);
+    } else {
+      console.log('❌ CORS - Origin blocked:', origin);
+      callback(new Error('Not allowed by CORS'));
     }
-    return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
 }));
 
-// --- Rate limiting for sensitive routes ---
+// ---------- Uploads: ensure dir exists & serve statically ----------
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+console.log('📁 UPLOAD_DIR:', UPLOAD_DIR);
+
+// Serve uploads BEFORE any catch-all routes/spa handlers
+app.use('/uploads', express.static(UPLOAD_DIR, {
+  fallthrough: false,
+  setHeaders(res) {
+    // Cache static files aggressively
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  },
+}));
+
+// (Optional) quick debug to list files on the server
+app.get('/debug/uploads', (_req, res) => {
+  try {
+    const files = fs.readdirSync(UPLOAD_DIR);
+    res.json({ uploadDir: UPLOAD_DIR, count: files.length, files });
+  } catch (e) {
+    res.status(500).json({ error: e.message, tried: UPLOAD_DIR });
+  }
+});
+
+// ---------- Basic rate limit for auth & otp ----------
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use('/api/pract/login', authLimiter);
 app.use('/api/pract/send-reset-otp', authLimiter);
 
-// --- Ensure uploads dir exists ---
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-console.log('📁 UPLOAD_DIR:', UPLOAD_DIR);
-
-// --- Serve uploads statically ---
-app.use('/uploads', express.static(UPLOAD_DIR, {
-  fallthrough: false,
-  setHeaders(res) {
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-  }
-}));
-
-// --- Health check endpoint ---
+// ---------- Health check ----------
 app.get('/', (_req, res) => {
   res.json({
     status: 'OK',
     message: 'Netanix CTF Server is running',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
-// --- Upload endpoint ---
+// ---------- Simple upload test endpoint (field name: "file") ----------
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ ok: false, error: 'No file uploaded' });
 
     const filename = req.file.filename;
     const relativePath = `/uploads/${filename}`;
-    const url = process.env.PUBLIC_BASE_URL
-      ? `${process.env.PUBLIC_BASE_URL}${relativePath}`
-      : relativePath;
-
-    // Example: Save relativePath to DB if you want
-    // await Challenge.create({ filePath: relativePath, ... });
+    const base = process.env.PUBLIC_BASE_URL || '';
+    const url = `${base}${relativePath}`;
 
     return res.json({ ok: true, filename, path: relativePath, url });
-  } catch (err) {
-    console.error('❌ Upload error:', err);
-    return res.status(500).json({ ok: false, error: err.message });
+  } catch (e) {
+    console.error('Upload error:', e);
+    res.status(500).json({ ok: false, error: e.message });
   }
 });
 
-// --- Debug route (optional; remove in prod) ---
-app.get('/debug/uploads', (_req, res) => {
-  try {
-    const files = fs.readdirSync(UPLOAD_DIR);
-    res.json({ uploadDir: UPLOAD_DIR, count: files.length, files });
-  } catch (err) {
-    res.status(500).json({ error: err.message, tried: UPLOAD_DIR });
-  }
-});
-
-// --- Your existing routes ---
+// ---------- Routes ----------
 app.use('/api/pract', require('./Route/pracRoute'));
 app.use('/api/member', require('./Route/memberRoute'));
 app.use('/api/ctf', require('./Route/ctfRoute'));
 app.use('/api/team', require('./Route/teamRoute'));
 app.use('/api/registration', require('./Route/registrationRoute'));
 
-// --- Boot server ---
-(async () => {
+// ---------- Boot ----------
+const startServer = async () => {
   try {
+    // Check required environment variables for MySQL
     const required = ['JWT_SECRET', 'DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
     const missing = required.filter((k) => !process.env[k] || String(process.env[k]).trim() === '');
     if (missing.length) {
-      console.error('❌ Missing required env vars:', missing.join(', '));
+      console.error('❌ Missing required environment variables:', missing.join(', '));
+      console.error('Create or update \'express-server/.env\' with these values.');
       return;
     }
 
@@ -122,11 +131,14 @@ app.use('/api/registration', require('./Route/registrationRoute'));
     initializeModels();
 
     app.listen(PORT, () => {
-      console.log(`🚀 Netanix CTF Server running on port ${PORT}`);
-      console.log(`🖼️ Uploads available at ${process.env.PUBLIC_BASE_URL || ''}/uploads`);
+      console.log(`🚀 Netanix CTF Server running at http://localhost:${PORT}`);
+      console.log(`🖼️ Uploads served from: ${UPLOAD_DIR}`);
+      console.log(`📊 Admin Panel: http://localhost:${PORT}/api/ctf/`);
+      console.log(`🎯 Frontend origins: ${allowedOrigins.join(', ')}`);
     });
-  } catch (err) {
-    console.error('❌ Server failed to start:', err.stack || err.message);
+  } catch (error) {
+    console.error('❌ Server failed to start:', error.stack || error.message);
   }
-})();
+};
 
+startServer();
