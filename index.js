@@ -12,36 +12,33 @@ const path = require('path');
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
 
-// DB
+// ---------- Database ----------
 const { sequelize, connectDB } = require('./db/database');
 const { initializeModels } = require('./model/index');
 
-// Multer config (uses Railway Volume if UPLOAD_DIR is set)
+// ---------- Multer config ----------
 const { upload, UPLOAD_DIR } = require('./middleware/multerConfig');
 
-// ---------- Security & parsing ----------
+// ---------- Security & Parsing ----------
 app.use(helmet());
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
 
-// ---------- CORS with credentials ----------
+// ---------- CORS ----------
 const allowedOrigins = [
   process.env.CLIENT_ORIGIN,
   process.env.CLIENT_ORIGIN?.replace(/\/$/, ''), // Remove trailing slash if present
   'https://ctfbackend-production.up.railway.app', // Railway backend URL
-  'http://localhost:5173', // Common React dev port
+  'http://localhost:5173', // React dev port
 ].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Debug logging for production troubleshooting
     console.log('🔍 CORS Debug - Origin received:', origin);
     console.log('🔍 CORS Debug - CLIENT_ORIGIN env:', process.env.CLIENT_ORIGIN);
     console.log('🔍 CORS Debug - Allowed origins:', allowedOrigins);
 
-    // Allow requests with no origin (mobile apps, curl, server-to-server)
-    if (!origin) return callback(null, true);
-
+    if (!origin) return callback(null, true); // mobile apps / curl
     if (allowedOrigins.indexOf(origin) !== -1) {
       console.log('✅ CORS - Origin allowed:', origin);
       callback(null, true);
@@ -54,20 +51,17 @@ app.use(cors({
   optionsSuccessStatus: 200,
 }));
 
-// ---------- Uploads: ensure dir exists & serve statically ----------
+// ---------- Uploads ----------
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 console.log('📁 UPLOAD_DIR:', UPLOAD_DIR);
 
-// Serve uploads BEFORE any catch-all routes/spa handlers
 app.use('/uploads', express.static(UPLOAD_DIR, {
   fallthrough: false,
   setHeaders(res) {
-    // Cache static files aggressively
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   },
 }));
 
-// (Optional) quick debug to list files on the server
 app.get('/debug/uploads', (_req, res) => {
   try {
     const files = fs.readdirSync(UPLOAD_DIR);
@@ -77,21 +71,12 @@ app.get('/debug/uploads', (_req, res) => {
   }
 });
 
-// ---------- Basic rate limit for auth & otp ----------
+// ---------- Rate limiting ----------
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use('/api/pract/login', authLimiter);
 app.use('/api/pract/send-reset-otp', authLimiter);
 
-// ---------- Health check ----------
-app.get('/', (_req, res) => {
-  res.json({
-    status: 'OK',
-    message: 'Netanix CTF Server is running',
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// ---------- Simple upload test endpoint (field name: "file") ----------
+// ---------- Simple Upload Endpoint ----------
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ ok: false, error: 'No file uploaded' });
@@ -108,22 +93,38 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// ---------- Routes ----------
+// ---------- API Routes ----------
 app.use('/api/pract', require('./Route/pracRoute'));
 app.use('/api/member', require('./Route/memberRoute'));
 app.use('/api/ctf', require('./Route/ctfRoute'));
 app.use('/api/team', require('./Route/teamRoute'));
 app.use('/api/registration', require('./Route/registrationRoute'));
 
-// ---------- Boot ----------
+// ---------- Serve React Frontend ----------
+const clientBuildPath = path.join(process.cwd(), 'dist');
+app.use(express.static(clientBuildPath));
+
+// Catch-all route for React Router
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(clientBuildPath, 'index.html'));
+});
+
+// ---------- Health Check ----------
+app.get('/health', (_req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'Netanix CTF Server is running',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ---------- Start Server ----------
 const startServer = async () => {
   try {
-    // Check required environment variables for MySQL
     const required = ['JWT_SECRET', 'DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
     const missing = required.filter((k) => !process.env[k] || String(process.env[k]).trim() === '');
     if (missing.length) {
       console.error('❌ Missing required environment variables:', missing.join(', '));
-      console.error('Create or update \'express-server/.env\' with these values.');
       return;
     }
 
