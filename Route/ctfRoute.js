@@ -384,7 +384,7 @@ router.get('/challenges', async (req, res) => {
     if (difficulty) where.difficulty = difficulty;
 
     // Pagination: support limit/offset or page/pageSize. Defaults for safety.
-    const size = Math.min(parseInt(pageSize || limit || 20, 10) || 20, 100);
+    const size = Math.min(parseInt(pageSize || limit || 40, 10) || 40, 100);
     const off = (() => {
       if (page) {
         const p = Math.max(parseInt(page, 10) || 1, 1);
