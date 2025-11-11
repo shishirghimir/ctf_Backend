@@ -19,7 +19,7 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-// CREATE user with optional admin role and validation
+// CREATE user
 const createUsers = async (req, res) => {
   try {
     const { username, email, password, isAdmin, fullName, education, profession, contactNumber } = req.body;
@@ -50,11 +50,13 @@ const createUsers = async (req, res) => {
       education: education || null,
       profession: profession || null,
       contactNumber: contactNumber || null,
+      // totalPoints will default to 0 (via DB model)
     });
 
-    // Fire-and-forget welcome email (non-blocking)
-    try { await sendWelcomeEmail(newUser.email, newUser.fullName || newUser.username); } catch (e) { /* ignore */ }
+    // Non-blocking welcome email
+    sendWelcomeEmail(newUser.email, newUser.fullName || newUser.username).catch(() => {});
 
+    // ✅ Return full public profile (matches login/getMe shape)
     res.status(201).json({
       message: '✅ User created successfully',
       user: {
@@ -66,6 +68,7 @@ const createUsers = async (req, res) => {
         education: newUser.education,
         profession: newUser.profession,
         contactNumber: newUser.contactNumber,
+        totalPoints: newUser.totalPoints, // ✅ Fixes profile points
       },
     });
   } catch (error) {
@@ -80,7 +83,7 @@ const createUsers = async (req, res) => {
 const updateUsers = async (req, res) => {
   try {
     const { id } = req.params;
-    const { username, email, password, isAdmin } = req.body;
+    const { username, email, password, isAdmin, fullName, education, profession, contactNumber } = req.body;
 
     const user = await User.findByPk(id);
     if (!user) {
@@ -94,6 +97,10 @@ const updateUsers = async (req, res) => {
       user.password = await bcrypt.hash(password, salt);
     }
     if (typeof isAdmin === 'boolean') user.isAdmin = isAdmin;
+    if (fullName !== undefined) user.fullName = fullName;
+    if (education !== undefined) user.education = education;
+    if (profession !== undefined) user.profession = profession;
+    if (contactNumber !== undefined) user.contactNumber = contactNumber;
 
     await user.save();
 
@@ -104,6 +111,11 @@ const updateUsers = async (req, res) => {
         username: user.username,
         email: user.email,
         isAdmin: user.isAdmin,
+        fullName: user.fullName,
+        education: user.education,
+        profession: user.profession,
+        contactNumber: user.contactNumber,
+        totalPoints: user.totalPoints, // ✅ Always include
       },
     });
   } catch (error) {
@@ -119,7 +131,6 @@ const updateUsers = async (req, res) => {
 const deleteUsers = async (req, res) => {
   try {
     const { id } = req.params;
-
     const deleted = await User.destroy({ where: { id } });
 
     if (deleted) {
@@ -136,11 +147,10 @@ const deleteUsers = async (req, res) => {
   }
 };
 
-// LOGIN user (cookie-based JWT)
+// LOGIN user
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-
     const user = await User.findOne({ where: { email } });
     if (!user) {
       return res.status(404).json({ message: '❌ User not found' });
@@ -151,40 +161,37 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ message: '❌ Invalid credentials' });
     }
 
-    // Update last login time
     user.lastLogin = new Date();
     await user.save();
 
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-    // Production-ready cookie settings for cross-domain deployment
     res.cookie('token', token, {
       httpOnly: true,
-      secure: true,        // Always true for HTTPS (required for production)
-      sameSite: 'none',    // Required for cross-domain cookies (Vercel + Railway)
-      maxAge: 60 * 60 * 1000, // 1h
+      secure: true,
+      sameSite: 'none',
+      maxAge: 60 * 60 * 1000,
     });
 
-    // Send login notification (non-blocking)
-    try {
-      const ipAddress = req.headers['x-forwarded-for'] || 
-                       req.connection.remoteAddress || 
-                       req.socket.remoteAddress ||
-                       (req.connection.socket ? req.connection.socket.remoteAddress : null);
-      
-      await NotificationService.notifyLogin(user.id, user.username, ipAddress);
-    } catch (notificationError) {
-      console.error('Failed to send login notification:', notificationError);
-      // Don't fail the login if notification fails
-    }
+    // Non-blocking login notification
+    const ipAddress = req.headers['x-forwarded-for'] || 
+                     req.connection.remoteAddress || 
+                     req.socket.remoteAddress ||
+                     (req.connection.socket ? req.connection.socket.remoteAddress : null);
+    NotificationService.notifyLogin(user.id, user.username, ipAddress).catch(() => {});
 
     res.status(200).json({
       message: '✅ Login successful',
       user: {
         id: user.id,
-        email: user.email,
         username: user.username,
+        email: user.email,
         isAdmin: user.isAdmin,
+        fullName: user.fullName,
+        education: user.education,
+        profession: user.profession,
+        contactNumber: user.contactNumber,
+        totalPoints: user.totalPoints, // ✅ Critical for profile
       },
     });
   } catch (error) {
@@ -195,12 +202,12 @@ const loginUser = async (req, res) => {
   }
 };
 
+// LOGOUT user
 const logoutUser = async (_req, res) => {
-  // Clear cookie with same settings as login for proper removal
   res.clearCookie('token', {
     httpOnly: true,
-    secure: true,        // Must match login cookie settings
-    sameSite: 'none',    // Must match login cookie settings
+    secure: true,
+    sameSite: 'none',
   });
   res.json({ message: '✅ Logged out' });
 };
