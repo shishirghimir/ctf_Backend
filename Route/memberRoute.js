@@ -1,11 +1,11 @@
 // routes/member.js
 const express = require('express');
-const { Op } = require('sequelize'); // Required for uniqueness check
+const { Op } = require('sequelize');
 const router = express.Router();
 const verifyToken = require('../middleware/auth');
 const User = require('../model/usermodel');
 
-// GET /api/member/me — fetch current member profile
+// GET /api/member/me
 router.get('/me', verifyToken, (req, res) => {
   if (req.user.isAdmin) {
     return res.status(403).json({ message: '❌ Admins are not allowed here' });
@@ -13,14 +13,14 @@ router.get('/me', verifyToken, (req, res) => {
   res.json(req.user);
 });
 
-// PUT /api/member/me — update member profile (including username)
+// PUT /api/member/me — update profile (username, email, and other fields)
 router.put('/me', verifyToken, async (req, res) => {
   if (req.user.isAdmin) {
     return res.status(403).json({ message: '❌ Admins are not allowed here' });
   }
 
   try {
-    const { fullName, username, education, profession, contactNumber } = req.body;
+    const { fullName, username, email, education, profession, contactNumber } = req.body;
     const userId = req.user.id;
 
     const user = await User.findByPk(userId);
@@ -28,7 +28,33 @@ router.put('/me', verifyToken, async (req, res) => {
       return res.status(404).json({ message: '❌ User not found' });
     }
 
-    // ✅ Handle username update (if provided)
+    // ✅ Validate and update email (if provided)
+    if (email !== undefined) {
+      const trimmedEmail = email.trim().toLowerCase();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      if (!trimmedEmail) {
+        return res.status(400).json({ message: '❌ Email cannot be empty' });
+      }
+      if (!emailRegex.test(trimmedEmail)) {
+        return res.status(400).json({ message: '❌ Please provide a valid email address' });
+      }
+
+      // Check uniqueness
+      const existingEmail = await User.findOne({
+        where: {
+          email: trimmedEmail,
+          id: { [Op.ne]: userId }
+        }
+      });
+      if (existingEmail) {
+        return res.status(409).json({ message: '❌ This email is already in use' });
+      }
+
+      user.email = trimmedEmail;
+    }
+
+    // ✅ Validate and update username (if provided)
     if (username !== undefined) {
       const trimmed = username.trim();
       if (!trimmed) {
@@ -38,20 +64,18 @@ router.put('/me', verifyToken, async (req, res) => {
         return res.status(400).json({ message: '❌ Username must be 3–20 characters long' });
       }
       if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
-        return res.status(400).json({ 
-          message: '❌ Username can only contain letters, numbers, underscores (_), and hyphens (-)' 
+        return res.status(400).json({
+          message: '❌ Username can only contain letters, numbers, underscores (_), and hyphens (-)'
         });
       }
 
-      // Check uniqueness (case-insensitive alternative if needed, but Sequelize is case-sensitive by default)
-      const existing = await User.findOne({
+      const existingUser = await User.findOne({
         where: {
           username: trimmed,
           id: { [Op.ne]: userId }
         }
       });
-
-      if (existing) {
+      if (existingUser) {
         return res.status(409).json({ message: '❌ Username is already taken' });
       }
 
@@ -66,7 +90,6 @@ router.put('/me', verifyToken, async (req, res) => {
 
     await user.save();
 
-    // Return updated user (excluding sensitive fields like password)
     res.json({
       message: '✅ Profile updated successfully',
       user: {
@@ -81,7 +104,7 @@ router.put('/me', verifyToken, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('Member profile update error:', err);
+    console.error('Profile update error:', err);
     res.status(500).json({ message: '❌ Server error while updating profile' });
   }
 });
