@@ -164,13 +164,13 @@ const loginUser = async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '4h' });
 
     res.cookie('token', token, {
       httpOnly: true,
       secure: true,
       sameSite: 'none',
-      maxAge: 60 * 60 * 1000,
+      maxAge: 4 * 60 * 60 * 1000,
     });
 
     // Non-blocking login notification
