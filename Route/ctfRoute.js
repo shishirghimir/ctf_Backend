@@ -1260,5 +1260,48 @@ router.post('/challenges/:id/hint', verifyToken, async (req, res) => {
     });
   }
 });
+// -------- Admin: Get User Profile with Solved Challenges --------
+router.get('/admin/users/:id/profile', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const userId = req.params.id;
 
+    // Fetch user
+    const user = await User.findByPk(userId, {
+      attributes: ['id', 'username', 'email', 'isAdmin', 'totalPoints', 'createdAt']
+    });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Fetch solved challenges via Submissions
+    const solvedSubmissions = await Submission.findAll({
+      where: { userId, correct: true },
+      attributes: ['challengeId', 'pointsAwarded', 'createdAt', 'isFirstSolve'],
+      include: [{
+        model: Challenge,
+        attributes: ['id', 'title', 'points', 'categoryId'],
+        include: [{ model: Category, attributes: ['name'] }]
+      }],
+      order: [['createdAt', 'DESC']]
+    });
+
+    const solvedChallenges = solvedSubmissions.map(sub => ({
+      id: sub.challengeId,
+      title: sub.Challenge.title,
+      points: sub.Challenge.points,
+      pointsAwarded: sub.pointsAwarded,
+      solvedAt: sub.createdAt,
+      category: sub.Challenge.Category ? sub.Challenge.Category.name : 'Uncategorized',
+      isFirstSolve: sub.isFirstSolve
+    }));
+
+    res.json({
+      ...user.toJSON(),
+      solvedChallenges
+    });
+  } catch (error) {
+    console.error('Admin user profile error:', error);
+    res.status(500).json({ message: 'Failed to load user profile' });
+  }
+});
 module.exports = router;
