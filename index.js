@@ -20,7 +20,25 @@ const { initializeModels } = require('./model/index');
 const { upload, UPLOAD_DIR } = require('./middleware/multerConfig');
 
 // ---------- Security & parsing ----------
-app.use(helmet());
+app.use(helmet()); // Base helmet protection
+
+// Extra headers for Mozilla Observatory + Nikto
+app.use(
+  helmet.frameguard({ action: 'deny' }) // X-Frame-Options: DENY
+);
+app.use(
+  helmet.hsts({ maxAge: 63072000, includeSubDomains: true, preload: true }) // Strict-Transport-Security
+);
+app.use(helmet.noSniff()); // X-Content-Type-Options: nosniff
+app.use(helmet.referrerPolicy({ policy: 'no-referrer' })); // Referrer-Policy
+app.use(helmet.permittedCrossDomainPolicies()); // Optional: cross-domain policy
+
+// Custom headers
+app.use((req, res, next) => {
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()'); // Permissions-Policy
+  next();
+});
+
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
 
@@ -34,12 +52,10 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Debug logging for production troubleshooting
     console.log('🔍 CORS Debug - Origin received:', origin);
     console.log('🔍 CORS Debug - CLIENT_ORIGIN env:', process.env.CLIENT_ORIGIN);
     console.log('🔍 CORS Debug - Allowed origins:', allowedOrigins);
 
-    // Allow requests with no origin (mobile apps, curl, server-to-server)
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.indexOf(origin) !== -1) {
@@ -58,16 +74,13 @@ app.use(cors({
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 console.log('📁 UPLOAD_DIR:', UPLOAD_DIR);
 
-// Serve uploads BEFORE any catch-all routes/spa handlers
 app.use('/uploads', express.static(UPLOAD_DIR, {
   fallthrough: false,
   setHeaders(res) {
-    // Cache static files aggressively
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   },
 }));
 
-// (Optional) quick debug to list files on the server
 app.get('/debug/uploads', (_req, res) => {
   try {
     const files = fs.readdirSync(UPLOAD_DIR);
@@ -91,7 +104,7 @@ app.get('/', (_req, res) => {
   });
 });
 
-// ---------- Simple upload test endpoint (field name: "file") ----------
+// ---------- Simple upload test endpoint ----------
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ ok: false, error: 'No file uploaded' });
@@ -118,12 +131,10 @@ app.use('/api/registration', require('./Route/registrationRoute'));
 // ---------- Boot ----------
 const startServer = async () => {
   try {
-    // Check required environment variables for MySQL
     const required = ['JWT_SECRET', 'DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
     const missing = required.filter((k) => !process.env[k] || String(process.env[k]).trim() === '');
     if (missing.length) {
       console.error('❌ Missing required environment variables:', missing.join(', '));
-      console.error('Create or update \'express-server/.env\' with these values.');
       return;
     }
 
