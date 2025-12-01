@@ -334,7 +334,7 @@ router.get('/admin/challenges', verifyToken, requireAdmin, async (req, res) => {
     if (category) where.categoryId = category;
     if (difficulty) where.difficulty = difficulty;
 
-    const size = Math.min(parseInt(pageSize || limit || 50, 10) || 50, 200);
+    const size = Math.min(parseInt(pageSize || limit || 60, 10) || 60, 200);
     const off = (() => {
       if (page) {
         const p = Math.max(parseInt(page, 10) || 1, 1);
