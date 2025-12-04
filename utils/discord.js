@@ -7,6 +7,60 @@ const WEBHOOKS = {
 };
 
 /**
+ * Converts HTML to Image using htmlcsstoimage.com API (FREE)
+ * Sign up at https://htmlcsstoimage.com/ to get your API key
+ */
+async function htmlToImage(html) {
+  try {
+    const HCTI_API_USER_ID = '01KBM7S9MP2TPRBSYSYAT9FZKH'; // Get from htmlcsstoimage.com
+    const HCTI_API_KEY = '019ae87c-a696-73c8-9f2a-f4d176b5d2e9';     // Get from htmlcsstoimage.com
+    
+    const response = await axios.post(
+      'https://hcti.io/v1/image',
+      { html: html },
+      {
+        auth: {
+          username: HCTI_API_USER_ID,
+          password: HCTI_API_KEY
+        }
+      }
+    );
+    
+    return response.data.url;
+  } catch (err) {
+    console.error("Error converting HTML to image:", err.message);
+    return null;
+  }
+}
+
+/**
+ * Sends Discord message with image URL
+ */
+async function sendDiscordWithImage(webhook, imageUrl, title, description) {
+  try {
+    const embed = {
+      title: title,
+      description: description,
+      color: title.includes("FIRST BLOOD") ? 0xDC143C : 0x3498DB,
+      image: {
+        url: imageUrl
+      },
+      footer: {
+        text: "NETANIX CTF"
+      },
+      timestamp: new Date().toISOString()
+    };
+    
+    await axios.post(webhook, { embeds: [embed] });
+    console.log("✅ Discord notification sent successfully");
+    return true;
+  } catch (err) {
+    console.error("❌ Discord Error:", err.response?.data || err.message);
+    return false;
+  }
+}
+
+/**
  * Generates First Blood HTML with blood dripping effects
  */
 function generateFirstBloodHTML(solverUsername, challengeTitle) {
@@ -16,7 +70,6 @@ function generateFirstBloodHTML(solverUsername, challengeTitle) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>First Blood</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@700&family=Roboto:wght@400;700&display=swap');
         
@@ -39,12 +92,6 @@ function generateFirstBloodHTML(solverUsername, challengeTitle) {
             width: 200%;
             height: 200%;
             background: radial-gradient(circle, rgba(220, 20, 60, 0.1) 0%, transparent 70%);
-            animation: pulse 3s ease-in-out infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 0.5; }
-            50% { transform: scale(1.1); opacity: 0.8; }
         }
         
         .content {
@@ -68,12 +115,6 @@ function generateFirstBloodHTML(solverUsername, challengeTitle) {
             text-shadow: 0 0 20px rgba(255, 0, 0, 0.8), 0 0 40px rgba(255, 0, 0, 0.6), 0 0 60px rgba(255, 0, 0, 0.4), 0 5px 10px rgba(0, 0, 0, 0.8);
             position: relative;
             display: inline-block;
-            animation: glow 2s ease-in-out infinite;
-        }
-        
-        @keyframes glow {
-            0%, 100% { text-shadow: 0 0 20px rgba(255, 0, 0, 0.8), 0 0 40px rgba(255, 0, 0, 0.6), 0 0 60px rgba(255, 0, 0, 0.4), 0 5px 10px rgba(0, 0, 0, 0.8); }
-            50% { text-shadow: 0 0 30px rgba(255, 0, 0, 1), 0 0 60px rgba(255, 0, 0, 0.8), 0 0 90px rgba(255, 0, 0, 0.6), 0 5px 10px rgba(0, 0, 0, 0.8); }
         }
         
         .blood-drips {
@@ -82,16 +123,14 @@ function generateFirstBloodHTML(solverUsername, challengeTitle) {
             left: 0;
             right: 0;
             height: 80px;
-            overflow: visible;
         }
         
         .drip {
             position: absolute;
             width: 6px;
+            height: 50px;
             background: linear-gradient(to bottom, #ff0000 0%, #8b0000 50%, transparent 100%);
             border-radius: 0 0 50% 50%;
-            animation: dripping 3s ease-in-out infinite;
-            filter: blur(0.5px);
         }
         
         .drip::before {
@@ -104,28 +143,14 @@ function generateFirstBloodHTML(solverUsername, challengeTitle) {
             height: 12px;
             background: radial-gradient(circle, #ff0000 0%, #8b0000 70%, transparent 100%);
             border-radius: 50%;
-            animation: droplet 3s ease-in-out infinite;
         }
         
-        @keyframes dripping {
-            0% { height: 0; opacity: 0; }
-            20% { height: 40px; opacity: 1; }
-            80% { height: 50px; opacity: 0.8; }
-            100% { height: 50px; opacity: 0; }
-        }
-        
-        @keyframes droplet {
-            0%, 20% { opacity: 0; transform: translateX(-50%) translateY(0); }
-            40% { opacity: 1; transform: translateX(-50%) translateY(10px); }
-            100% { opacity: 0; transform: translateX(-50%) translateY(20px); }
-        }
-        
-        .drip:nth-child(1) { left: 15%; animation-delay: 0s; }
-        .drip:nth-child(2) { left: 28%; animation-delay: 0.5s; }
-        .drip:nth-child(3) { left: 42%; animation-delay: 0.2s; }
-        .drip:nth-child(4) { left: 58%; animation-delay: 0.7s; }
-        .drip:nth-child(5) { left: 72%; animation-delay: 0.3s; }
-        .drip:nth-child(6) { left: 85%; animation-delay: 0.9s; }
+        .drip:nth-child(1) { left: 15%; }
+        .drip:nth-child(2) { left: 28%; height: 45px; }
+        .drip:nth-child(3) { left: 42%; height: 40px; }
+        .drip:nth-child(4) { left: 58%; height: 48px; }
+        .drip:nth-child(5) { left: 72%; height: 42px; }
+        .drip:nth-child(6) { left: 85%; height: 46px; }
         
         .blood-pool {
             position: absolute;
@@ -135,26 +160,13 @@ function generateFirstBloodHTML(solverUsername, challengeTitle) {
             height: 15px;
             background: radial-gradient(ellipse at center, rgba(139, 0, 0, 0.8) 0%, transparent 70%);
             filter: blur(4px);
-            animation: poolSpread 3s ease-in-out infinite;
-        }
-        
-        @keyframes poolSpread {
-            0% { transform: scaleX(0.5); opacity: 0; }
-            50% { transform: scaleX(1); opacity: 1; }
-            100% { transform: scaleX(1.1); opacity: 0.6; }
         }
         
         .trophy-icon {
             font-size: 60px;
             margin-bottom: 20px;
             display: inline-block;
-            animation: bounce 2s ease-in-out infinite;
             filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.6));
-        }
-        
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
         }
         
         .solver-name {
@@ -174,7 +186,6 @@ function generateFirstBloodHTML(solverUsername, challengeTitle) {
             border-radius: 15px;
             border: 1px solid rgba(220, 20, 60, 0.3);
             margin-bottom: 30px;
-            backdrop-filter: blur(10px);
         }
         
         .challenge-label {
@@ -257,20 +268,13 @@ function generateFirstBloodHTML(solverUsername, challengeTitle) {
             background: rgba(255, 0, 0, 0.6);
             border-radius: 50%;
             box-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
-            animation: float 6s ease-in-out infinite;
         }
         
-        @keyframes float {
-            0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
-            50% { opacity: 1; }
-            100% { transform: translateY(-100px) translateX(20px); opacity: 0; }
-        }
-        
-        .particle:nth-child(1) { top: 20%; left: 10%; animation-delay: 0s; }
-        .particle:nth-child(2) { top: 40%; left: 30%; animation-delay: 1s; }
-        .particle:nth-child(3) { top: 60%; left: 50%; animation-delay: 2s; }
-        .particle:nth-child(4) { top: 30%; left: 70%; animation-delay: 1.5s; }
-        .particle:nth-child(5) { top: 80%; left: 90%; animation-delay: 0.5s; }
+        .particle:nth-child(1) { top: 20%; left: 10%; }
+        .particle:nth-child(2) { top: 40%; left: 30%; }
+        .particle:nth-child(3) { top: 60%; left: 50%; }
+        .particle:nth-child(4) { top: 30%; left: 70%; }
+        .particle:nth-child(5) { top: 80%; left: 90%; }
     </style>
 </head>
 <body>
@@ -350,7 +354,6 @@ function generateNewChallengeHTML(challengeTitle, category = "General", difficul
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>New Challenge</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@700&family=Roboto:wght@400;700&display=swap');
         
@@ -373,12 +376,6 @@ function generateNewChallengeHTML(challengeTitle, category = "General", difficul
             width: 200%;
             height: 200%;
             background: radial-gradient(circle, rgba(52, 152, 219, 0.15) 0%, transparent 70%);
-            animation: pulse 4s ease-in-out infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.5; }
-            50% { transform: scale(1.1) rotate(180deg); opacity: 0.8; }
         }
         
         .content {
@@ -403,27 +400,14 @@ function generateNewChallengeHTML(challengeTitle, category = "General", difficul
             letter-spacing: 4px;
             text-transform: uppercase;
             box-shadow: 0 6px 25px rgba(52, 152, 219, 0.5);
-            animation: badgePulse 2s ease-in-out infinite;
             border: 2px solid rgba(255, 255, 255, 0.3);
-        }
-        
-        @keyframes badgePulse {
-            0%, 100% { transform: scale(1); box-shadow: 0 6px 25px rgba(52, 152, 219, 0.5); }
-            50% { transform: scale(1.05); box-shadow: 0 8px 35px rgba(52, 152, 219, 0.7); }
         }
         
         .challenge-icon {
             font-size: 80px;
             margin: 30px 0;
             display: inline-block;
-            animation: iconFloat 3s ease-in-out infinite;
             filter: drop-shadow(0 0 30px rgba(52, 152, 219, 0.6));
-        }
-        
-        @keyframes iconFloat {
-            0%, 100% { transform: translateY(0) rotate(0deg); }
-            25% { transform: translateY(-15px) rotate(-5deg); }
-            75% { transform: translateY(-10px) rotate(5deg); }
         }
         
         .challenge-title-container {
@@ -441,14 +425,8 @@ function generateNewChallengeHTML(challengeTitle, category = "General", difficul
             text-shadow: 0 0 20px rgba(52, 152, 219, 0.8), 0 0 40px rgba(52, 152, 219, 0.5), 0 5px 15px rgba(0, 0, 0, 0.8);
             position: relative;
             display: inline-block;
-            animation: titleGlow 3s ease-in-out infinite;
             line-height: 1.2;
             text-transform: uppercase;
-        }
-        
-        @keyframes titleGlow {
-            0%, 100% { text-shadow: 0 0 20px rgba(52, 152, 219, 0.8), 0 0 40px rgba(52, 152, 219, 0.5), 0 5px 15px rgba(0, 0, 0, 0.8); }
-            50% { text-shadow: 0 0 30px rgba(52, 152, 219, 1), 0 0 60px rgba(52, 152, 219, 0.8), 0 5px 15px rgba(0, 0, 0, 0.8); }
         }
         
         .energy-waves {
@@ -470,15 +448,6 @@ function generateNewChallengeHTML(challengeTitle, category = "General", difficul
             height: 100%;
             border: 2px solid rgba(52, 152, 219, 0.3);
             border-radius: 50%;
-            animation: waveExpand 3s ease-out infinite;
-        }
-        
-        .wave:nth-child(2) { animation-delay: 1s; }
-        .wave:nth-child(3) { animation-delay: 2s; }
-        
-        @keyframes waveExpand {
-            0% { width: 0%; height: 0%; opacity: 1; }
-            100% { width: 150%; height: 150%; opacity: 0; }
         }
         
         .subtitle {
@@ -513,7 +482,6 @@ function generateNewChallengeHTML(challengeTitle, category = "General", difficul
             border-radius: 15px;
             text-align: center;
             border: 2px solid rgba(52, 152, 219, 0.3);
-            backdrop-filter: blur(10px);
         }
         
         .detail-label {
@@ -564,22 +532,14 @@ function generateNewChallengeHTML(challengeTitle, category = "General", difficul
             background: rgba(52, 152, 219, 0.6);
             border-radius: 50%;
             box-shadow: 0 0 10px rgba(52, 152, 219, 0.8);
-            animation: particleFloat 8s ease-in-out infinite;
         }
         
-        @keyframes particleFloat {
-            0%, 100% { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { transform: translateY(-120px) translateX(40px) scale(0.5); opacity: 0; }
-        }
-        
-        .particle:nth-child(1) { top: 20%; left: 10%; animation-delay: 0s; }
-        .particle:nth-child(2) { top: 40%; left: 25%; animation-delay: 2s; }
-        .particle:nth-child(3) { top: 60%; left: 40%; animation-delay: 4s; }
-        .particle:nth-child(4) { top: 30%; left: 55%; animation-delay: 1s; }
-        .particle:nth-child(5) { top: 70%; left: 70%; animation-delay: 3s; }
-        .particle:nth-child(6) { top: 50%; left: 85%; animation-delay: 5s; }
+        .particle:nth-child(1) { top: 20%; left: 10%; }
+        .particle:nth-child(2) { top: 40%; left: 25%; }
+        .particle:nth-child(3) { top: 60%; left: 40%; }
+        .particle:nth-child(4) { top: 30%; left: 55%; }
+        .particle:nth-child(5) { top: 70%; left: 70%; }
+        .particle:nth-child(6) { top: 50%; left: 85%; }
         
         .sparkle {
             position: absolute;
@@ -588,15 +548,8 @@ function generateNewChallengeHTML(challengeTitle, category = "General", difficul
             background: white;
             border-radius: 50%;
             box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
-            animation: sparkle 2s ease-in-out infinite;
         }
         
-        @keyframes sparkle {
-            0%, 100% { opacity: 0; transform: scale(0); }
-            50% { opacity: 1; transform: scale(1); }
-        }
-        
-        .sparkle:nth-child(odd) { animation-delay: 0.5s; }
         .sparkle:nth-child(7) { top: 20%; left: 15%; }
         .sparkle:nth-child(8) { top: 40%; left: 85%; }
         .sparkle:nth-child(9) { top: 60%; left: 10%; }
@@ -669,50 +622,29 @@ function generateNewChallengeHTML(challengeTitle, category = "General", difficul
   `;
 }
 
-/**
- * Sends Discord message with HTML content as attachment
- */
-async function sendDiscordWithHTML(webhook, html, filename) {
-  try {
-    const FormData = require('form-data');
-    const form = new FormData();
-    
-    // Create HTML file buffer
-    const htmlBuffer = Buffer.from(html, 'utf-8');
-    
-    form.append('file', htmlBuffer, {
-      filename: filename,
-      contentType: 'text/html'
-    });
-    
-    await axios.post(webhook, form, {
-      headers: form.getHeaders()
-    });
-    
-    console.log(`✅ Discord notification sent successfully: ${filename}`);
-    return true;
-  } catch (err) {
-    console.error("❌ Discord Error:", err.response?.data || err.message);
-    return false;
-  }
-}
-
 module.exports = {
   /**
-   * 🔥 FIRST BLOOD - Sends amazing HTML card with blood dripping
+   * 🔥 FIRST BLOOD - Sends amazing card with blood dripping
    * @param {string} solverUsername - Username of the solver
    * @param {string} challengeTitle - Title of the challenge
    */
   async sendFirstBlood(solverUsername, challengeTitle) {
     try {
-      console.log(`🩸 Sending First Blood notification for ${solverUsername}...`);
+      console.log(`🩸 Generating First Blood card for ${solverUsername}...`);
       
       const html = generateFirstBloodHTML(solverUsername, challengeTitle);
+      const imageUrl = await htmlToImage(html);
       
-      return await sendDiscordWithHTML(
+      if (!imageUrl) {
+        console.error("Failed to generate image");
+        return false;
+      }
+      
+      return await sendDiscordWithImage(
         WEBHOOKS.firstBlood,
-        html,
-        'first_blood.html'
+        imageUrl,
+        "🩸 FIRST BLOOD",
+        `**${solverUsername}** achieved first blood on **${challengeTitle}**!`
       );
     } catch (err) {
       console.error("Error in sendFirstBlood:", err);
@@ -721,21 +653,28 @@ module.exports = {
   },
 
   /**
-   * 🧩 NEW CHALLENGE - Sends amazing HTML card with energy effects
+   * 🧩 NEW CHALLENGE - Sends amazing card with energy effects
    * @param {string} challengeTitle - Title of the new challenge
    * @param {string} category - Challenge category (optional, default: "General")
    * @param {string} difficulty - Challenge difficulty: Easy, Medium, or Hard (optional, default: "Medium")
    */
   async sendNewChallenge(challengeTitle, category = "General", difficulty = "Medium") {
     try {
-      console.log(`🎯 Sending New Challenge notification for ${challengeTitle}...`);
+      console.log(`🎯 Generating New Challenge card for ${challengeTitle}...`);
       
       const html = generateNewChallengeHTML(challengeTitle, category, difficulty);
+      const imageUrl = await htmlToImage(html);
       
-      return await sendDiscordWithHTML(
+      if (!imageUrl) {
+        console.error("Failed to generate image");
+        return false;
+      }
+      
+      return await sendDiscordWithImage(
         WEBHOOKS.challenge,
-        html,
-        'new_challenge.html'
+        imageUrl,
+        "🆕 NEW CHALLENGE RELEASED",
+        `**${challengeTitle}** is now live! Category: ${category} | Difficulty: ${difficulty}`
       );
     } catch (err) {
       console.error("Error in sendNewChallenge:", err);
