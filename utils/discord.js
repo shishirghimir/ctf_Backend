@@ -65,6 +65,114 @@ module.exports = {
   },
 
   /**
+   * 🥈 SECOND BLOOD - Sends announcement for second solver
+   * @param {string} solverUsername - Username of the solver
+   * @param {string} challengeTitle - Title of the challenge
+   */
+  async sendSecondBlood(solverUsername, challengeTitle) {
+    try {
+      console.log(`🥈 Sending Second Blood notification for ${solverUsername}...`);
+      
+      const embed = {
+        title: "🥈 SECOND BLOOD",
+        description: `### 🎖️ ${solverUsername}\n\n**Conquered:** \`${challengeTitle}\`\n\n*Hot on the heels of the first!*`,
+        color: 0xC0C0C0, // Silver
+        fields: [
+          {
+            name: "⚔️ Achievement",
+            value: "Second Blood",
+            inline: true
+          },
+          {
+            name: "🎯 Challenge",
+            value: challengeTitle.length > 30 ? challengeTitle.substring(0, 30) + "..." : challengeTitle,
+            inline: true
+          },
+          {
+            name: "👤 Solver",
+            value: solverUsername,
+            inline: true
+          }
+        ],
+        footer: {
+          text: "🥈 NETANIX CTF • Second Blood Event"
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      return await sendDiscordEmbed(WEBHOOKS.firstBlood, embed);
+    } catch (err) {
+      console.error("Error in sendSecondBlood:", err);
+      return false;
+    }
+  },
+
+  /**
+   * 🥉 THIRD BLOOD - Sends announcement for third solver
+   * @param {string} solverUsername - Username of the solver
+   * @param {string} challengeTitle - Title of the challenge
+   */
+  async sendThirdBlood(solverUsername, challengeTitle) {
+    try {
+      console.log(`🥉 Sending Third Blood notification for ${solverUsername}...`);
+      
+      const embed = {
+        title: "🥉 THIRD BLOOD",
+        description: `### 🏅 ${solverUsername}\n\n**Conquered:** \`${challengeTitle}\`\n\n*Rounding out the podium!*`,
+        color: 0xCD7F32, // Bronze
+        fields: [
+          {
+            name: "⚔️ Achievement",
+            value: "Third Blood",
+            inline: true
+          },
+          {
+            name: "🎯 Challenge",
+            value: challengeTitle.length > 30 ? challengeTitle.substring(0, 30) + "..." : challengeTitle,
+            inline: true
+          },
+          {
+            name: "👤 Solver",
+            value: solverUsername,
+            inline: true
+          }
+        ],
+        footer: {
+          text: "🥉 NETANIX CTF • Third Blood Event"
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      return await sendDiscordEmbed(WEBHOOKS.firstBlood, embed);
+    } catch (err) {
+      console.error("Error in sendThirdBlood:", err);
+      return false;
+    }
+  },
+
+  /**
+   * 🩸 BLOOD NOTIFICATION - Smart function that sends the appropriate blood notification
+   * @param {number} solveCount - Current solve count (1 = first, 2 = second, 3 = third)
+   * @param {string} solverUsername - Username of the solver
+   * @param {string} challengeTitle - Title of the challenge
+   */
+  async sendBloodNotification(solveCount, solverUsername, challengeTitle) {
+    try {
+      if (solveCount === 1) {
+        return await this.sendFirstBlood(solverUsername, challengeTitle);
+      } else if (solveCount === 2) {
+        return await this.sendSecondBlood(solverUsername, challengeTitle);
+      } else if (solveCount === 3) {
+        return await this.sendThirdBlood(solverUsername, challengeTitle);
+      }
+      return false;
+    } catch (err) {
+      console.error("Error in sendBloodNotification:", err);
+      return false;
+    }
+  },
+
+  /**
    * 🧩 NEW CHALLENGE - Sends beautiful challenge announcement
    * @param {string} challengeTitle - Title of the new challenge
    * @param {string} category - Challenge category (optional, default: "General")
