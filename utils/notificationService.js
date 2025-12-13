@@ -56,13 +56,8 @@ class NotificationService {
       const message = `${solverUsername} just got the first blood on "${challengeTitle}"!`;
       const data = { challengeId, solverId, challengeTitle, solverUsername };
 
-      // DB notification
       await this.createGlobalNotification('first_blood', title, message, data, solverId);
-
-      // 📢 DISCORD FIRST BLOOD (ADDED)
       await sendFirstBlood(solverUsername, challengeTitle);
-
-      // Email notification
       await this.emailFirstBlood(challengeTitle, solverUsername, solverId);
 
       console.log(`First blood notification sent for challenge: ${challengeTitle}`);
@@ -72,22 +67,21 @@ class NotificationService {
   }
 
   // ================= NEW CHALLENGE =================
-  static async notifyNewChallenge(challengeTitle, authorUsername, challengeId, authorId) {
+  static async notifyNewChallenge(challengeTitle, authorUsername, challengeId, authorId, category, difficulty) {
     try {
+      // 📢 In-app & email: show author
       const title = '🎯 New Challenge Available!';
       const message = `A new challenge "${challengeTitle}" has been created by ${authorUsername}. Check it out!`;
-      const data = { challengeId, authorId, challengeTitle, authorUsername };
+      const data = { challengeId, authorId, challengeTitle, authorUsername, category, difficulty };
 
-      // DB notification
       await this.createGlobalNotification('challenge_created', title, message, data, authorId);
 
-      // 📢 DISCORD NEW CHALLENGE (NO CREATOR NAME) — ADDED
-      await sendNewChallenge(challengeTitle);
+      // 🚫 Discord: NO author — only title, category, difficulty
+      await sendNewChallenge(challengeTitle, category, difficulty);
 
-      // Email notification
       await this.emailNewChallenge(challengeTitle, authorUsername, authorId);
 
-      console.log(`New challenge notification sent for: ${challengeTitle}`);
+      console.log(`New challenge notification sent for: ${challengeTitle} [${category} / ${difficulty}]`);
     } catch (error) {
       console.error('Error sending new challenge notification:', error);
     }
@@ -101,7 +95,6 @@ class NotificationService {
       const data = { ipAddress, loginTime: new Date() };
 
       await this.createNotification(userId, 'login', title, message, data);
-
       console.log(`Login notification created for user: ${username}`);
     } catch (error) {
       console.error('Error creating login notification:', error);
@@ -133,7 +126,6 @@ class NotificationService {
         `
       });
 
-      // Batch email send
       const batchSize = 10;
       for (let i = 0; i < users.length; i += batchSize) {
         const batch = users.slice(i, i + batchSize);
@@ -184,7 +176,6 @@ class NotificationService {
         `
       });
 
-      // Batch send
       const batchSize = 10;
       for (let i = 0; i < users.length; i += batchSize) {
         const batch = users.slice(i, i + batchSize);
@@ -219,7 +210,6 @@ class NotificationService {
         limit,
         offset
       });
-
       return notifications;
     } catch (error) {
       console.error('Error fetching user notifications:', error);
@@ -234,7 +224,6 @@ class NotificationService {
         { isRead: true },
         { where: { id: notificationId, userId } }
       );
-
       return updatedRows > 0;
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -249,7 +238,6 @@ class NotificationService {
         { isRead: true },
         { where: { userId, isRead: false } }
       );
-
       return updatedRows;
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
@@ -263,7 +251,6 @@ class NotificationService {
       const count = await Notification.count({
         where: { userId, isRead: false }
       });
-
       return count;
     } catch (error) {
       console.error('Error getting unread notification count:', error);
@@ -275,13 +262,11 @@ class NotificationService {
   static async cleanupOldNotifications() {
     try {
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-
       const deletedCount = await Notification.destroy({
         where: {
           createdAt: { [require('sequelize').Op.lt]: thirtyDaysAgo }
         }
       });
-
       console.log(`Cleaned up ${deletedCount} old notifications`);
       return deletedCount;
     } catch (error) {
