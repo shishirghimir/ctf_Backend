@@ -35,13 +35,12 @@ module.exports = {
           { name: "👤 Solver", value: `**${solverUsername}**`, inline: true },
           { name: "🎯 Challenge", value: `\`${challengeTitle.length > 25 ? challengeTitle.substring(0, 25) + "..." : challengeTitle}\``, inline: true }
         ],
-        // 👇 USE YOUR IMGUR IMAGE HERE AS THUMBNAIL
         thumbnail: {
           url: "https://i.imgur.com/OBiq3ap.png"
         },
         footer: {
           text: "🔥 NETANIX CTF • First Blood Event",
-          icon_url: "https://i.imgur.com/5K8zXqW.png" // Optional: keep your bot logo here
+          icon_url: "https://i.imgur.com/5K8zXqW.png"
         },
         timestamp: new Date().toISOString()
       };
@@ -60,14 +59,14 @@ module.exports = {
       const embed = {
         title: `🥈 **SECOND BLOOD CLAIMED!**`,
         description: `## 🎖️ **${solverUsername}**\n\n> *Hot on the trail of the first!*\n\n# 🎯 **${challengeTitle}**\n\n*The race is on!*`,
-        color: 0xB0B0B0, // Light silver
+        color: 0xB0B0B0,
         fields: [
           { name: "⚔️ Achievement", value: "`SECOND BLOOD`", inline: true },
           { name: "👤 Solver", value: `**${solverUsername}**`, inline: true },
           { name: "🎯 Challenge", value: `\`${challengeTitle.length > 25 ? challengeTitle.substring(0, 25) + "..." : challengeTitle}\``, inline: true }
         ],
         thumbnail: {
-          url: "https://i.imgur.com/5K8zXqW.png" // You can change this too if you want
+          url: "https://i.imgur.com/5K8zXqW.png"
         },
         footer: {
           text: "🥈 NETANIX CTF • Second Blood",
@@ -90,7 +89,7 @@ module.exports = {
       const embed = {
         title: `🥉 **THIRD BLOOD CLAIMED!**`,
         description: `## 🏅 **${solverUsername}**\n\n> *Rounding out the podium!*\n\n# 🎯 **${challengeTitle}**\n\n*The legend grows!*`,
-        color: 0xCD7F32, // Bronze
+        color: 0xCD7F32,
         fields: [
           { name: "⚔️ Achievement", value: "`THIRD BLOOD`", inline: true },
           { name: "👤 Solver", value: `**${solverUsername}**`, inline: true },
@@ -128,32 +127,22 @@ module.exports = {
   },
 
   /**
-   * 🧩 NEW CHALLENGE — BEAUTIFUL, NO AUTHOR, REAL CATEGORY
+   * 🧩 NEW CHALLENGE — CLEAN, NO CATEGORY, NO DIFFICULTY, NO AUTHOR
    */
-  async sendNewChallenge(challengeTitle, category = "General", difficulty = "Medium") {
+  async sendNewChallenge(challengeTitle) {
     try {
-      const difficultyConfig = {
-        Easy: { color: 0x2ECC71, emoji: "🟢", name: "Easy" },
-        Medium: { color: 0xF39C12, emoji: "🟡", name: "Medium" },
-        Hard: { color: 0xE74C3C, emoji: "🔴", name: "Hard" }
-      };
-
-      const config = difficultyConfig[difficulty] || difficultyConfig.Medium;
+      console.log(`🎯 Sending New Challenge: ${challengeTitle}`);
 
       const embed = {
         title: `🔥 **NEW CHALLENGE UNLOCKED!**`,
-        description: `## 🎯 **${challengeTitle}**\n\n> *The gauntlet has been thrown. Can you rise to the challenge?*\n\n**Sharpen your tools. The clock is ticking.**`,
-        color: config.color,
-        fields: [
-          { name: "📁 Category", value: `\`**${category}**\``, inline: true },
-          { name: "💥 Difficulty", value: `${config.emoji} \`**${config.name}**\``, inline: true },
-          { name: "⏱️ Status", value: "🟢 \`**LIVE NOW**\`", inline: true }
-        ],
+        description: `## 🎯 **${challengeTitle}**\n\n> *A new challenge has dropped!*\n\n**Can you be the first to solve it?**`,
+        color: 0x3498DB, // Bright blue
+        // ❌ NO category, difficulty, or status fields
         thumbnail: {
           url: "https://i.imgur.com/5K8zXqW.png"
         },
         footer: {
-          text: "🧩 NETANIX CTF • New Challenge • Solve It First!",
+          text: "🧩 NETANIX CTF • New Challenge",
           icon_url: "https://i.imgur.com/5K8zXqW.png"
         },
         timestamp: new Date().toISOString()
@@ -167,7 +156,7 @@ module.exports = {
   },
 
   /**
-   * 🏅 CHALLENGE SOLVED — (Bonus feature, unused in your flow but kept)
+   * 🏅 CHALLENGE SOLVED — (Bonus, kept for completeness)
    */
   async sendChallengeSolved(solverUsername, challengeTitle, solveCount = null) {
     try {
