@@ -2,8 +2,8 @@ const axios = require("axios");
 
 // Your webhooks
 const WEBHOOKS = {
-  firstBlood: "https://discord.com/api/webhooks/1445795721881325731/b5V3RQbdLB0ZfNV_O3ivkNKTCDTOUcwB40J1Qeoqly-k-SDkXFTVLFyVhzF4cxGIS82h",
-  challenge: "https://discord.com/api/webhooks/1445795960583225550/aM2M6IjDiRVtuyDDdfK4-i-otNmcE5ROpgPcy4AVO3F1YI5GscUWDiVGhUwXWpQGyI_c"
+  firstBlood: "https://discord.com/api/webhooks/1445795721881325731/b5V3RQbdLB0ZfNV_O3ivkNKTCDTOUcwB40J1Qeoqly-k-SDkXFTVLFyVhzF4cxGIS82h  ",
+  challenge: "https://discord.com/api/webhooks/1445795960583225550/aM2M6IjDiRVtuyDDdfK4-i-otNmcE5ROpgPcy4AVO3F1YI5GscUWDiVGhUwXWpQGyI_c  "
 };
 
 /**
@@ -22,41 +22,29 @@ async function sendDiscordEmbed(webhook, embed) {
 
 module.exports = {
   /**
-   * 🔥 FIRST BLOOD - Sends dramatic announcement
-   * @param {string} solverUsername - Username of the solver
-   * @param {string} challengeTitle - Title of the challenge
+   * 🔥 FIRST BLOOD — EPIC, BOLD, CLEAN + YOUR IMAGE
    */
   async sendFirstBlood(solverUsername, challengeTitle) {
     try {
-      console.log(`🩸 Sending First Blood notification for ${solverUsername}...`);
-      
       const embed = {
-        title: "🩸 FIRST BLOOD",
-        description: `### 🏆 ${solverUsername}\n\n**Conquered:** \`${challengeTitle}\`\n\n*The first warrior to draw blood in this challenge!*`,
+        title: `🩸 **FIRST BLOOD CLAIMED!**`,
+        description: `## 🏆 **${solverUsername}**\n\n> *Drew the first drop of blood on:*\n\n# 🎯 **${challengeTitle}**\n\n*The hunt begins — who's next?*`,
         color: 0xDC143C, // Crimson red
         fields: [
-          {
-            name: "⚔️ Achievement",
-            value: "First Blood",
-            inline: true
-          },
-          {
-            name: "🎯 Challenge",
-            value: challengeTitle.length > 30 ? challengeTitle.substring(0, 30) + "..." : challengeTitle,
-            inline: true
-          },
-          {
-            name: "👤 Solver",
-            value: solverUsername,
-            inline: true
-          }
+          { name: "⚔️ Achievement", value: "`FIRST BLOOD`", inline: true },
+          { name: "👤 Solver", value: `**${solverUsername}**`, inline: true },
+          { name: "🎯 Challenge", value: `\`${challengeTitle.length > 25 ? challengeTitle.substring(0, 25) + "..." : challengeTitle}\``, inline: true }
         ],
+        // 👇 USE YOUR IMGUR IMAGE HERE AS THUMBNAIL
+        thumbnail: {
+          url: "https://i.imgur.com/OBiq3ap.png"
+        },
         footer: {
-          text: "🔥 NETANIX CTF • First Blood Event"
+          text: "🔥 NETANIX CTF • First Blood Event",
+          icon_url: "https://i.imgur.com/5K8zXqW.png" // Optional: keep your bot logo here
         },
         timestamp: new Date().toISOString()
       };
-
       return await sendDiscordEmbed(WEBHOOKS.firstBlood, embed);
     } catch (err) {
       console.error("Error in sendFirstBlood:", err);
@@ -65,41 +53,28 @@ module.exports = {
   },
 
   /**
-   * 🥈 SECOND BLOOD - Sends announcement for second solver
-   * @param {string} solverUsername - Username of the solver
-   * @param {string} challengeTitle - Title of the challenge
+   * 🥈 SECOND BLOOD — SILVER, CLEAN, CONSISTENT
    */
   async sendSecondBlood(solverUsername, challengeTitle) {
     try {
-      console.log(`🥈 Sending Second Blood notification for ${solverUsername}...`);
-      
       const embed = {
-        title: "🥈 SECOND BLOOD",
-        description: `### 🎖️ ${solverUsername}\n\n**Conquered:** \`${challengeTitle}\`\n\n*Hot on the heels of the first!*`,
-        color: 0xC0C0C0, // Silver
+        title: `🥈 **SECOND BLOOD CLAIMED!**`,
+        description: `## 🎖️ **${solverUsername}**\n\n> *Hot on the trail of the first!*\n\n# 🎯 **${challengeTitle}**\n\n*The race is on!*`,
+        color: 0xB0B0B0, // Light silver
         fields: [
-          {
-            name: "⚔️ Achievement",
-            value: "Second Blood",
-            inline: true
-          },
-          {
-            name: "🎯 Challenge",
-            value: challengeTitle.length > 30 ? challengeTitle.substring(0, 30) + "..." : challengeTitle,
-            inline: true
-          },
-          {
-            name: "👤 Solver",
-            value: solverUsername,
-            inline: true
-          }
+          { name: "⚔️ Achievement", value: "`SECOND BLOOD`", inline: true },
+          { name: "👤 Solver", value: `**${solverUsername}**`, inline: true },
+          { name: "🎯 Challenge", value: `\`${challengeTitle.length > 25 ? challengeTitle.substring(0, 25) + "..." : challengeTitle}\``, inline: true }
         ],
+        thumbnail: {
+          url: "https://i.imgur.com/5K8zXqW.png" // You can change this too if you want
+        },
         footer: {
-          text: "🥈 NETANIX CTF • Second Blood Event"
+          text: "🥈 NETANIX CTF • Second Blood",
+          icon_url: "https://i.imgur.com/5K8zXqW.png"
         },
         timestamp: new Date().toISOString()
       };
-
       return await sendDiscordEmbed(WEBHOOKS.firstBlood, embed);
     } catch (err) {
       console.error("Error in sendSecondBlood:", err);
@@ -108,41 +83,28 @@ module.exports = {
   },
 
   /**
-   * 🥉 THIRD BLOOD - Sends announcement for third solver
-   * @param {string} solverUsername - Username of the solver
-   * @param {string} challengeTitle - Title of the challenge
+   * 🥉 THIRD BLOOD — BRONZE, CLEAN, CONSISTENT
    */
   async sendThirdBlood(solverUsername, challengeTitle) {
     try {
-      console.log(`🥉 Sending Third Blood notification for ${solverUsername}...`);
-      
       const embed = {
-        title: "🥉 THIRD BLOOD",
-        description: `### 🏅 ${solverUsername}\n\n**Conquered:** \`${challengeTitle}\`\n\n*Rounding out the podium!*`,
+        title: `🥉 **THIRD BLOOD CLAIMED!**`,
+        description: `## 🏅 **${solverUsername}**\n\n> *Rounding out the podium!*\n\n# 🎯 **${challengeTitle}**\n\n*The legend grows!*`,
         color: 0xCD7F32, // Bronze
         fields: [
-          {
-            name: "⚔️ Achievement",
-            value: "Third Blood",
-            inline: true
-          },
-          {
-            name: "🎯 Challenge",
-            value: challengeTitle.length > 30 ? challengeTitle.substring(0, 30) + "..." : challengeTitle,
-            inline: true
-          },
-          {
-            name: "👤 Solver",
-            value: solverUsername,
-            inline: true
-          }
+          { name: "⚔️ Achievement", value: "`THIRD BLOOD`", inline: true },
+          { name: "👤 Solver", value: `**${solverUsername}**`, inline: true },
+          { name: "🎯 Challenge", value: `\`${challengeTitle.length > 25 ? challengeTitle.substring(0, 25) + "..." : challengeTitle}\``, inline: true }
         ],
+        thumbnail: {
+          url: "https://i.imgur.com/5K8zXqW.png"
+        },
         footer: {
-          text: "🥉 NETANIX CTF • Third Blood Event"
+          text: "🥉 NETANIX CTF • Third Blood",
+          icon_url: "https://i.imgur.com/5K8zXqW.png"
         },
         timestamp: new Date().toISOString()
       };
-
       return await sendDiscordEmbed(WEBHOOKS.firstBlood, embed);
     } catch (err) {
       console.error("Error in sendThirdBlood:", err);
@@ -151,20 +113,13 @@ module.exports = {
   },
 
   /**
-   * 🩸 BLOOD NOTIFICATION - Smart function that sends the appropriate blood notification
-   * @param {number} solveCount - Current solve count (1 = first, 2 = second, 3 = third)
-   * @param {string} solverUsername - Username of the solver
-   * @param {string} challengeTitle - Title of the challenge
+   * 🩸 BLOOD NOTIFICATION — SMART DISPATCH
    */
   async sendBloodNotification(solveCount, solverUsername, challengeTitle) {
     try {
-      if (solveCount === 1) {
-        return await this.sendFirstBlood(solverUsername, challengeTitle);
-      } else if (solveCount === 2) {
-        return await this.sendSecondBlood(solverUsername, challengeTitle);
-      } else if (solveCount === 3) {
-        return await this.sendThirdBlood(solverUsername, challengeTitle);
-      }
+      if (solveCount === 1) return await this.sendFirstBlood(solverUsername, challengeTitle);
+      if (solveCount === 2) return await this.sendSecondBlood(solverUsername, challengeTitle);
+      if (solveCount === 3) return await this.sendThirdBlood(solverUsername, challengeTitle);
       return false;
     } catch (err) {
       console.error("Error in sendBloodNotification:", err);
@@ -173,47 +128,33 @@ module.exports = {
   },
 
   /**
-   * 🧩 NEW CHALLENGE - Sends beautiful challenge announcement
-   * @param {string} challengeTitle - Title of the new challenge
-   * @param {string} category - Challenge category (optional, default: "General")
-   * @param {string} difficulty - Challenge difficulty: Easy, Medium, or Hard (optional, default: "Medium")
+   * 🧩 NEW CHALLENGE — BEAUTIFUL, NO AUTHOR, REAL CATEGORY
    */
   async sendNewChallenge(challengeTitle, category = "General", difficulty = "Medium") {
     try {
-      console.log(`🎯 Sending New Challenge notification for ${challengeTitle}...`);
-      
-      // Difficulty colors and emojis
       const difficultyConfig = {
-        Easy: { color: 0x2ECC71, emoji: "🟢" },
-        Medium: { color: 0xF39C12, emoji: "🟡" },
-        Hard: { color: 0xE74C3C, emoji: "🔴" }
+        Easy: { color: 0x2ECC71, emoji: "🟢", name: "Easy" },
+        Medium: { color: 0xF39C12, emoji: "🟡", name: "Medium" },
+        Hard: { color: 0xE74C3C, emoji: "🔴", name: "Hard" }
       };
 
       const config = difficultyConfig[difficulty] || difficultyConfig.Medium;
 
       const embed = {
-        title: "🆕 NEW CHALLENGE RELEASED",
-        description: `## 🎯 ${challengeTitle}\n\nA new challenge awaits! Can you solve it?\n\n*Get ready to test your skills!*`,
-        color: 0x3498DB, // Bright blue
+        title: `🔥 **NEW CHALLENGE UNLOCKED!**`,
+        description: `## 🎯 **${challengeTitle}**\n\n> *The gauntlet has been thrown. Can you rise to the challenge?*\n\n**Sharpen your tools. The clock is ticking.**`,
+        color: config.color,
         fields: [
-          {
-            name: "📂 Category",
-            value: `\`${category}\``,
-            inline: true
-          },
-          {
-            name: "⚡ Difficulty",
-            value: `${config.emoji} **${difficulty}**`,
-            inline: true
-          },
-          {
-            name: "📊 Status",
-            value: "🟢 **LIVE NOW**",
-            inline: true
-          }
+          { name: "📁 Category", value: `\`**${category}**\``, inline: true },
+          { name: "💥 Difficulty", value: `${config.emoji} \`**${config.name}**\``, inline: true },
+          { name: "⏱️ Status", value: "🟢 \`**LIVE NOW**\`", inline: true }
         ],
+        thumbnail: {
+          url: "https://i.imgur.com/5K8zXqW.png"
+        },
         footer: {
-          text: "🧩 NETANIX CTF • New Challenge"
+          text: "🧩 NETANIX CTF • New Challenge • Solve It First!",
+          icon_url: "https://i.imgur.com/5K8zXqW.png"
         },
         timestamp: new Date().toISOString()
       };
@@ -226,19 +167,14 @@ module.exports = {
   },
 
   /**
-   * 🏅 CHALLENGE SOLVED - Sends solve notification (bonus feature)
-   * @param {string} solverUsername - Username of the solver
-   * @param {string} challengeTitle - Title of the challenge
-   * @param {number} solveCount - Number of solves (optional)
+   * 🏅 CHALLENGE SOLVED — (Bonus feature, unused in your flow but kept)
    */
   async sendChallengeSolved(solverUsername, challengeTitle, solveCount = null) {
     try {
-      console.log(`✅ Sending Challenge Solved notification for ${solverUsername}...`);
-      
       const embed = {
         title: "✅ Challenge Solved",
         description: `**${solverUsername}** just solved **${challengeTitle}**! 🎉`,
-        color: 0x00D166, // Green
+        color: 0x00D166,
         fields: solveCount ? [
           {
             name: "🔢 Total Solves",
@@ -251,7 +187,6 @@ module.exports = {
         },
         timestamp: new Date().toISOString()
       };
-
       return await sendDiscordEmbed(WEBHOOKS.challenge, embed);
     } catch (err) {
       console.error("Error in sendChallengeSolved:", err);
