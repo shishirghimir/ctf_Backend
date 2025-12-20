@@ -139,11 +139,11 @@ module.exports = {
         color: 0x3498DB, // Bright blue
         // ❌ NO category, difficulty, or status fields
         thumbnail: {
-          url: "https://i.imgur.com/5K8zXqW.png"
+          url: "https://imgur.com/a/cAmdOaK"
         },
         footer: {
           text: "🧩 NETANIX CTF • New Challenge",
-          icon_url: "https://i.imgur.com/5K8zXqW.png"
+          icon_url: "https://imgur.com/a/cAmdOaK"
         },
         timestamp: new Date().toISOString()
       };
