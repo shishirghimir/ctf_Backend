@@ -71,7 +71,7 @@ module.exports = {
         },
         footer: {
           text: "🔥 NETANIX CTF • First Blood Event",
-          icon_url: "https://i.imgur.com/5K8zXqW.png"
+          icon_url: "https://i.imgur.com/OBiq3ap.png"
         },
         timestamp: new Date().toISOString()
       };
