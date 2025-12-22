@@ -110,7 +110,7 @@ module.exports = {
           { name: "\u200B", value: `**${getRandomText(CHALLENGE_TEXTS)}**`, inline: false }
         ],
         image: {
-          url: "https://imgur.com/HavGjsW"
+          url: "https://i.imgur.com/HavGjsW.png"  // ✅ Fixed: direct image URL
         },
         footer: {
           text: "🧩 NETANIX CTF • New Challenge",
