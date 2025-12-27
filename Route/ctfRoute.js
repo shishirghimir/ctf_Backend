@@ -546,286 +546,163 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
   try {
     const { flag } = req.body;
     if (!flag) return res.status(400).json({ message: 'flag is required' });
-    
-    const sanitizedFlag = sanitizeInput(flag.trim());
-    const ipAddress = getClientIP(req);
-    const userAgent = req.headers['user-agent'];
-    
-    const ch = await Challenge.findByPk(req.params.id);
-    if (!ch || !ch.isActive) {
-      return res.status(404).json({ message: 'Challenge not found' });
-    }
 
-    // Get user and check if they're in a team
+    const sanitizedFlag = sanitizeInput(flag.trim());
+
+    // ✅ FIX: Always get IP safely
+    const ipAddress = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+
+    const ch = await Challenge.findByPk(req.params.id);
+    if (!ch || !ch.isActive) return res.status(404).json({ message: 'Challenge not found' });
+
     const user = await User.findByPk(req.user.id);
     const team = user.teamId ? await Team.findByPk(user.teamId) : null;
-    
-    // Check if tournament mode is active
-    const activeTournament = await Tournament.findOne({
-      where: { isActive: true }
-    });
-    
-    // Determine if this should be team scoring:
-    // 1. Tournament is active AND user is in a team = Team scoring
-    // 2. Challenge is marked as tournamentOnly but no active tournament = Error
-    // 3. Otherwise = Individual scoring
+
+    const activeTournament = await Tournament.findOne({ where: { isActive: true } });
     const shouldUseTeamScoring = activeTournament && team && team.tournamentMode;
     const isTournamentOnlyChallenge = ch.tournamentOnly;
-    
-    // If challenge is tournament-only but no active tournament, block submission
+
     if (isTournamentOnlyChallenge && !activeTournament) {
-      return res.status(400).json({
-        message: 'This challenge is only available during tournament mode',
-        tournamentRequired: true
-      });
+      return res.status(400).json({ message: 'This challenge is only available during tournament mode', tournamentRequired: true });
     }
-    
-    // If tournament is active but user is not in a team, and challenge requires tournament
+
     if (activeTournament && (ch.isTeamChallenge || ch.tournamentOnly) && !team) {
-      return res.status(400).json({
-        message: 'You must be in a team to participate in tournament challenges',
-        teamRequired: true
-      });
+      return res.status(400).json({ message: 'You must be in a team to participate in tournament challenges', teamRequired: true });
     }
 
+    // ------- RATE LIMITING -------
+    async function upsertAttempt() {
+      const now = new Date();
+      let attempt = await Attempt.findOne({ where: { userId: user.id, challengeId: ch.id } });
+
+      if (!attempt) {
+        return await Attempt.create({ userId: user.id, challengeId: ch.id, attemptCount: 1, lastAttemptAt: now, ipAddress });
+      }
+
+      if (attempt.blockedUntil && now >= attempt.blockedUntil) {
+        attempt.attemptCount = 0;
+        attempt.blockedUntil = null;
+      }
+
+      if (attempt.attemptCount >= 3) {
+        attempt.blockedUntil = new Date(now.getTime() + 7000); // block 7 sec
+        await attempt.save();
+        return { blocked: true, waitTime: 7 };
+      }
+
+      attempt.attemptCount += 1;
+      attempt.lastAttemptAt = now;
+      attempt.ipAddress = ipAddress; // ✅ always updated
+      await attempt.save();
+      return attempt;
+    }
+
+    const rateLimitCheck = await upsertAttempt();
+    if (rateLimitCheck.blocked) {
+      return res.status(429).json({ message: `Too many attempts. Wait ${rateLimitCheck.waitTime} seconds.`, waitTime: rateLimitCheck.waitTime, remainingAttempts: 0 });
+    }
+
+    const providedHash = hashFlag(sanitizedFlag);
+    const correct = crypto.timingSafeEqual(Buffer.from(providedHash), Buffer.from(ch.flagHash));
+
+    // -------- TEAM SCORING --------
     if (shouldUseTeamScoring) {
-      // TEAM SCORING LOGIC (Tournament Mode)
-
-      // Check if team has already solved this challenge
-      const existingTeamScore = await TeamScore.findOne({
-        where: { teamId: team.id, challengeId: ch.id }
-      });
-
-      if (existingTeamScore) {
-        return res.status(400).json({ 
-          message: 'Your team has already solved this challenge',
-          alreadySolved: true,
-          isTeamChallenge: true
-        });
-      }
-
-      // Check rate limiting for team challenges
-      const rateLimitCheck = await checkSubmissionRateLimit(req.user.id, ch.id, ipAddress);
-      if (!rateLimitCheck.allowed) {
-        return res.status(429).json({
-          message: rateLimitCheck.message,
-          waitTime: rateLimitCheck.waitTime,
-          remainingAttempts: rateLimitCheck.remainingAttempts,
-          isTeamChallenge: true
-        });
-      }
-
-      const providedHash = hashFlag(sanitizedFlag);
-      const correct = crypto.timingSafeEqual(Buffer.from(providedHash), Buffer.from(ch.flagHash));
+      const existingTeamScore = await TeamScore.findOne({ where: { teamId: team.id, challengeId: ch.id } });
+      if (existingTeamScore) return res.status(400).json({ message: 'Your team has already solved this challenge', alreadySolved: true, isTeamChallenge: true });
 
       let pointsAwarded = 0;
       let isFirstSolve = false;
 
       if (correct) {
         pointsAwarded = ch.points;
-        
-        // Check if this is the first solve for this challenge
         if (!ch.firstSolverId) {
           isFirstSolve = true;
-          // Award bonus points for first solve (50% bonus)
           pointsAwarded = Math.floor(ch.points * 1.5);
-          
-          // Update challenge with first solver info and set solve count to 1
-          await Challenge.update({
-            firstSolverId: req.user.id,
-            firstSolvedAt: new Date(),
-            solveCount: 1
-          }, { where: { id: ch.id } });
-
-          // Send first blood notifications
-          try {
-            const solver = await User.findByPk(req.user.id, { attributes: ['username'] });
-            await NotificationService.notifyFirstBlood(
-              ch.title,
-              solver.username,
-              ch.id,
-              req.user.id
-            );
-          } catch (notificationError) {
-            console.error('Failed to send first blood notifications:', notificationError);
-            // Don't fail the submission if notifications fail
-          }
+          await Challenge.update({ firstSolverId: user.id, firstSolvedAt: new Date(), solveCount: 1 }, { where: { id: ch.id } });
         } else {
-          // Increment solve count for subsequent solves
           await Challenge.increment('solveCount', { where: { id: ch.id } });
         }
 
-        // Calculate final points after hint deductions
-        const usedHints = await TeamHint.findAll({
-          where: { teamId: team.id, challengeId: ch.id }
-        });
-        
-        const totalHintPenalty = usedHints.reduce((sum, hint) => sum + hint.pointsDeducted, 0);
+        const usedHints = await TeamHint.findAll({ where: { teamId: team.id, challengeId: ch.id } });
+        const totalHintPenalty = usedHints.reduce((sum, h) => sum + h.pointsDeducted, 0);
         const finalPoints = Math.max(0, pointsAwarded - totalHintPenalty);
 
-        // Create team score record
         await TeamScore.create({
           teamId: team.id,
           challengeId: ch.id,
-          solvedBy: req.user.id,
+          solvedBy: user.id,
           points: pointsAwarded,
           hintsUsed: usedHints.length,
           pointsDeducted: totalHintPenalty,
-          finalPoints: finalPoints,
+          finalPoints,
           solvedAt: new Date(),
           tournamentMode: team.tournamentMode || false
         });
 
-        // Update team's total points
-        await Team.increment('totalPoints', { 
-          by: finalPoints, 
-          where: { id: team.id } 
-        });
+        await Team.increment('totalPoints', { by: finalPoints, where: { id: team.id } });
+        await Attempt.destroy({ where: { userId: user.id, challengeId: ch.id } });
 
-        // Reset attempt counter on successful solve
-        await Attempt.destroy({
-          where: { userId: req.user.id, challengeId: ch.id }
-        });
-
-        const response = {
+        return res.json({
           correct: true,
           pointsAwarded: finalPoints,
           originalPoints: pointsAwarded,
           hintPenalty: totalHintPenalty,
-          remainingAttempts: rateLimitCheck.remainingAttempts,
           isFirstSolve,
           isTeamChallenge: true,
-          teamName: team.name
-        };
-
-        if (isFirstSolve) {
-          response.message = `🎉 Congratulations! Your team is the FIRST to solve this challenge! Bonus points awarded!`;
-        } else {
-          response.message = `✅ Correct! Your team earned ${finalPoints} points!`;
-        }
-
-        return res.json(response);
-      } else {
-        // Incorrect submission for team challenge
-        return res.json({
-          correct: false,
-          pointsAwarded: 0,
-          remainingAttempts: rateLimitCheck.remainingAttempts,
-          isTeamChallenge: true,
-          message: `❌ Incorrect flag. ${rateLimitCheck.remainingAttempts} attempts remaining.`
+          teamName: team.name,
+          message: isFirstSolve ? `🎉 Congratulations! Your team is FIRST to solve this challenge!` : `✅ Correct! Your team earned ${finalPoints} points!`
         });
+      } else {
+        return res.json({ correct: false, pointsAwarded: 0, remainingAttempts: 3 - (rateLimitCheck.attemptCount || 1), isTeamChallenge: true, message: '❌ Incorrect flag.' });
       }
     }
 
-    // Handle individual challenges (non-team challenges)
-    // Check rate limiting
-    const rateLimitCheck = await checkSubmissionRateLimit(req.user.id, ch.id, ipAddress);
-    if (!rateLimitCheck.allowed) {
-      return res.status(429).json({
-        message: rateLimitCheck.message,
-        waitTime: rateLimitCheck.waitTime,
-        remainingAttempts: rateLimitCheck.remainingAttempts
-      });
-    }
-
-    // Check if user already solved this challenge
-    const previousCorrect = await Submission.findOne({ 
-      where: { userId: req.user.id, challengeId: ch.id, correct: true } 
-    });
-
-    if (previousCorrect) {
-      return res.status(400).json({ 
-        message: 'You have already solved this challenge',
-        alreadySolved: true
-      });
-    }
-
-    const providedHash = hashFlag(sanitizedFlag);
-    const correct = crypto.timingSafeEqual(Buffer.from(providedHash), Buffer.from(ch.flagHash));
+    // -------- INDIVIDUAL SCORING --------
+    const previousCorrect = await Submission.findOne({ where: { userId: user.id, challengeId: ch.id, correct: true } });
+    if (previousCorrect) return res.status(400).json({ message: 'You have already solved this challenge', alreadySolved: true });
 
     let pointsAwarded = 0;
     let isFirstSolve = false;
 
     if (correct) {
       pointsAwarded = ch.points;
-      
-      // Check if this is the first solve
       if (!ch.firstSolverId) {
         isFirstSolve = true;
-        // Award bonus points for first solve (50% bonus)
         pointsAwarded = Math.floor(ch.points * 1.5);
-        
-        // Update challenge with first solver info and set solve count to 1
-        await Challenge.update({
-          firstSolverId: req.user.id,
-          firstSolvedAt: new Date(),
-          solveCount: 1
-        }, { where: { id: ch.id } });
-
-        // Send first blood notifications
-        try {
-          const solver = await User.findByPk(req.user.id, { attributes: ['username'] });
-          await NotificationService.notifyFirstBlood(
-            ch.title,
-            solver.username,
-            ch.id,
-            req.user.id
-          );
-        } catch (notificationError) {
-          console.error('Failed to send first blood notifications:', notificationError);
-          // Don't fail the submission if notifications fail
-        }
+        await Challenge.update({ firstSolverId: user.id, firstSolvedAt: new Date(), solveCount: 1 }, { where: { id: ch.id } });
       } else {
-        // Increment solve count for subsequent solves
         await Challenge.increment('solveCount', { where: { id: ch.id } });
       }
 
-      // Update user's total points
-      await User.increment('totalPoints', { 
-        by: pointsAwarded, 
-        where: { id: req.user.id } 
-      });
-
-      // Reset attempt counter on successful solve
-      await Attempt.destroy({
-        where: { userId: req.user.id, challengeId: ch.id }
-      });
+      await User.increment('totalPoints', { by: pointsAwarded, where: { id: user.id } });
+      await Attempt.destroy({ where: { userId: user.id, challengeId: ch.id } });
     }
 
-    // Create submission record
-    const submission = await Submission.create({
-      userId: req.user.id,
+    await Submission.create({
+      userId: user.id,
       challengeId: ch.id,
       correct,
       pointsAwarded,
-      submittedFlag: hashFlag(sanitizedFlag), // Store hashed version for analysis
-      ipAddress,
+      submittedFlag: providedHash,
+      ipAddress, // ✅ fixed IP
       userAgent,
       isFirstSolve
     });
 
-    const response = {
+    res.json({
       correct,
       pointsAwarded,
-      submissionId: submission.id,
-      remainingAttempts: rateLimitCheck.remainingAttempts,
-      isFirstSolve
-    };
-
-    if (isFirstSolve) {
-      response.message = `🎉 Congratulations! You are the FIRST to solve this challenge! Bonus points awarded!`;
-    } else if (correct) {
-      response.message = `✅ Correct! Well done!`;
-    } else {
-      response.message = `❌ Incorrect flag. ${rateLimitCheck.remainingAttempts} attempts remaining.`;
-    }
-
-    res.json(response);
+      remainingAttempts: 3 - (rateLimitCheck.attemptCount || 1),
+      isFirstSolve,
+      message: correct ? (isFirstSolve ? '🎉 You are FIRST to solve this challenge!' : '✅ Correct!') : '❌ Incorrect flag.'
+    });
   } catch (e) {
     console.error('Submission error:', e);
     res.status(500).json({ message: 'Submission failed', error: e.message });
   }
 });
+
 
 // -------- User: Get Solved Challenges --------
 router.get('/user/solved', verifyToken, async (req, res) => {
