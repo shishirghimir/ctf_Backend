@@ -129,7 +129,7 @@ const connectDB = async () => {
         attemptCount INT DEFAULT 1,
         lastAttemptAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         blockedUntil DATETIME NULL,
-        ipAddress VARCHAR(45),
+        ipAddress VARCHAR(100),
         createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (userId) REFERENCES Users(id) ON DELETE CASCADE,
