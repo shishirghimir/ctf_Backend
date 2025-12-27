@@ -22,19 +22,15 @@ const { upload, UPLOAD_DIR } = require('./middleware/multerConfig');
 app.use(helmet()); // Base helmet protection
 
 // Extra headers for Mozilla Observatory + Nikto
-app.use(
-  helmet.frameguard({ action: 'deny' }) // X-Frame-Options: DENY
-);
-app.use(
-  helmet.hsts({ maxAge: 63072000, includeSubDomains: true, preload: true }) // Strict-Transport-Security
-);
-app.use(helmet.noSniff()); // X-Content-Type-Options: nosniff
-app.use(helmet.referrerPolicy({ policy: 'no-referrer' })); // Referrer-Policy
-app.use(helmet.permittedCrossDomainPolicies()); // Optional: cross-domain policy
+app.use(helmet.frameguard({ action: 'deny' }));
+app.use(helmet.hsts({ maxAge: 63072000, includeSubDomains: true, preload: true }));
+app.use(helmet.noSniff());
+app.use(helmet.referrerPolicy({ policy: 'no-referrer' }));
+app.use(helmet.permittedCrossDomainPolicies());
 
 // Custom headers
 app.use((req, res, next) => {
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()'); // Permissions-Policy
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   next();
 });
 
@@ -45,23 +41,16 @@ app.use(express.json({ limit: '1mb' }));
 const allowedOrigins = [
   process.env.CLIENT_ORIGIN,
   process.env.CLIENT_ORIGIN?.replace(/\/$/, ''), // Remove trailing slash if present
-  'https://ctfbackend-production.up.railway.app', // Railway backend URL
-  'http://localhost:5173', // Common React dev port
+  'https://ctfbackend-production.up.railway.app',
+  'http://localhost:5173',
 ].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
-    console.log('🔍 CORS Debug - Origin received:', origin);
-    console.log('🔍 CORS Debug - CLIENT_ORIGIN env:', process.env.CLIENT_ORIGIN);
-    console.log('🔍 CORS Debug - Allowed origins:', allowedOrigins);
-
     if (!origin) return callback(null, true);
-
     if (allowedOrigins.indexOf(origin) !== -1) {
-      console.log('✅ CORS - Origin allowed:', origin);
       callback(null, true);
     } else {
-      console.log('❌ CORS - Origin blocked:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -73,7 +62,6 @@ app.use(cors({
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 console.log('📁 UPLOAD_DIR:', UPLOAD_DIR);
 
-// Serve uploads statically
 app.use('/uploads', express.static(UPLOAD_DIR, {
   fallthrough: false,
   setHeaders(res) {
@@ -81,17 +69,16 @@ app.use('/uploads', express.static(UPLOAD_DIR, {
   },
 }));
 
-// Upload endpoint
+// ---------- Upload endpoint ----------
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ ok: false, error: 'No file uploaded' });
 
     const filename = req.file.filename;
 
-    // Fix double slash issue in URL
-    const base = process.env.PUBLIC_BASE_URL || 'https://api.netanixctf.xyz';
-    const url = `${base}/uploads/${filename}`.replace(/([^:]\/)\/+/g, '$1'); 
-    // Replaces multiple slashes with one, but keeps "https://"
+    // FIXED: remove trailing slash from base URL
+    const base = (process.env.PUBLIC_BASE_URL || 'https://api.netanixctf.xyz').replace(/\/$/, '');
+    const url = `${base}/uploads/${filename}`;
 
     return res.json({ ok: true, filename, url });
   } catch (e) {
@@ -100,7 +87,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// Safe download route
+// ---------- Safe download route ----------
 app.get('/download/:filename', (req, res) => {
   try {
     const filePath = path.join(UPLOAD_DIR, req.params.filename);
