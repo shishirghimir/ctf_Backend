@@ -88,9 +88,10 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
     const filename = req.file.filename;
 
-    // Build correct URL without double slashes
-    const base = process.env.PUBLIC_BASE_URL || `https://api.netanixctf.xyz`;
-    const url = `${base}/uploads/${filename}`.replace(/\/+/g, '/');
+    // Fix double slash issue in URL
+    const base = process.env.PUBLIC_BASE_URL || 'https://api.netanixctf.xyz';
+    const url = `${base}/uploads/${filename}`.replace(/([^:]\/)\/+/g, '$1'); 
+    // Replaces multiple slashes with one, but keeps "https://"
 
     return res.json({ ok: true, filename, url });
   } catch (e) {
