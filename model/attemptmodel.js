@@ -8,7 +8,7 @@ const Attempt = sequelize.define('Attempt', {
   attemptCount: { type: DataTypes.INTEGER, defaultValue: 1 },
   lastAttemptAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   blockedUntil: { type: DataTypes.DATE, allowNull: true },
-  ipAddress: { type: DataTypes.STRING(45), allowNull: true },
+  ipAddress: { type: DataTypes.STRING(100), allowNull: true },
 }, { 
   timestamps: true,
   indexes: [
