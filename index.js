@@ -1,4 +1,3 @@
-// index.js
 require('dotenv').config();
 
 const express = require('express');
@@ -74,6 +73,7 @@ app.use(cors({
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 console.log('📁 UPLOAD_DIR:', UPLOAD_DIR);
 
+// Serve uploads statically
 app.use('/uploads', express.static(UPLOAD_DIR, {
   fallthrough: false,
   setHeaders(res) {
@@ -81,12 +81,42 @@ app.use('/uploads', express.static(UPLOAD_DIR, {
   },
 }));
 
-app.get('/debug/uploads', (_req, res) => {
+// Upload endpoint
+app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
-    const files = fs.readdirSync(UPLOAD_DIR);
-    res.json({ uploadDir: UPLOAD_DIR, count: files.length, files });
+    if (!req.file) return res.status(400).json({ ok: false, error: 'No file uploaded' });
+
+    const filename = req.file.filename;
+
+    // Build correct URL without double slashes
+    const base = process.env.PUBLIC_BASE_URL || `https://api.netanixctf.xyz`;
+    const url = `${base}/uploads/${filename}`.replace(/\/+/g, '/');
+
+    return res.json({ ok: true, filename, url });
   } catch (e) {
-    res.status(500).json({ error: e.message, tried: UPLOAD_DIR });
+    console.error('Upload error:', e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Safe download route
+app.get('/download/:filename', (req, res) => {
+  try {
+    const filePath = path.join(UPLOAD_DIR, req.params.filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ ok: false, error: 'File not found' });
+    }
+
+    res.download(filePath, (err) => {
+      if (err) {
+        console.error('Download error:', err);
+        res.status(500).json({ ok: false, error: 'Failed to download' });
+      }
+    });
+  } catch (e) {
+    console.error('Download error:', e);
+    res.status(500).json({ ok: false, error: e.message });
   }
 });
 
@@ -102,23 +132,6 @@ app.get('/', (_req, res) => {
     message: 'Netanix CTF Server is running',
     timestamp: new Date().toISOString(),
   });
-});
-
-// ---------- Simple upload test endpoint ----------
-app.post('/api/upload', upload.single('file'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ ok: false, error: 'No file uploaded' });
-
-    const filename = req.file.filename;
-    const relativePath = `/uploads/${filename}`;
-    const base = process.env.PUBLIC_BASE_URL || '';
-    const url = `${base}${relativePath}`;
-
-    return res.json({ ok: true, filename, path: relativePath, url });
-  } catch (e) {
-    console.error('Upload error:', e);
-    res.status(500).json({ ok: false, error: e.message });
-  }
 });
 
 // ---------- Routes ----------
