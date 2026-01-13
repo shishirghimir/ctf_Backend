@@ -1,6 +1,6 @@
 const { User, Notification } = require('../model/index');
 const { transporter, buildBaseEmail } = require('./mailer');
-const { sendFirstBlood, sendNewChallenge } = require('./discord'); // <-- ADDED
+const { sendFirstBlood, sendNewChallenge } = require('./discord');
 
 const FROM_EMAIL = process.env.MAIL_FROM_EMAIL || process.env.SMTP_USER;
 const FROM_NAME = process.env.MAIL_FROM_NAME || 'Netanix Portal';
@@ -52,38 +52,75 @@ class NotificationService {
   // ================= FIRST BLOOD =================
   static async notifyFirstBlood(challengeTitle, solverUsername, challengeId, solverId) {
     try {
+      console.log('');
+      console.log('🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸');
+      console.log('🩸 FIRST BLOOD FUNCTION CALLED!');
+      console.log('🩸 Parameters received:');
+      console.log('🩸   challengeTitle:', challengeTitle);
+      console.log('🩸   solverUsername:', solverUsername);
+      console.log('🩸   challengeId:', challengeId);
+      console.log('🩸   solverId:', solverId);
+      console.log('🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸🩸');
+      console.log('');
+      
       const title = '🩸 First Blood!';
       const message = `${solverUsername} just got the first blood on "${challengeTitle}"!`;
       const data = { challengeId, solverId, challengeTitle, solverUsername };
 
+      // Create in-app notifications
       await this.createGlobalNotification('first_blood', title, message, data, solverId);
-      await sendFirstBlood(solverUsername, challengeTitle);
-      await this.emailFirstBlood(challengeTitle, solverUsername, solverId);
+      console.log('✅ In-app notifications created');
 
-      console.log(`First blood notification sent for challenge: ${challengeTitle}`);
+      // Send Discord notification
+      try {
+        await sendFirstBlood(solverUsername, challengeTitle);
+        console.log('✅ Discord notification sent');
+      } catch (discordError) {
+        console.error('❌ Discord error:', discordError.message);
+      }
+
+      // Send emails
+      await this.emailFirstBlood(challengeTitle, solverUsername, solverId);
+      console.log('✅ Emails sent');
+
+      console.log(`✅ First blood notification completed for: ${challengeTitle}`);
     } catch (error) {
-      console.error('Error sending first blood notification:', error);
+      console.error('❌ Error sending first blood notification:', error);
+      console.error('Stack:', error.stack);
     }
   }
 
   // ================= NEW CHALLENGE =================
-  static async notifyNewChallenge(challengeTitle, authorUsername, challengeId, authorId, category, difficulty) {
+  // ✅ Made category and difficulty OPTIONAL with default values
+  static async notifyNewChallenge(challengeTitle, authorUsername, challengeId, authorId, category = 'General', difficulty = 'Medium') {
     try {
+      console.log(`🎯 New Challenge triggered: ${challengeTitle} by ${authorUsername}`);
+      
       // 📢 In-app & email: show author
       const title = '🎯 New Challenge Available!';
       const message = `A new challenge "${challengeTitle}" has been created by ${authorUsername}. Check it out!`;
       const data = { challengeId, authorId, challengeTitle, authorUsername, category, difficulty };
 
+      // Create in-app notifications
       await this.createGlobalNotification('challenge_created', title, message, data, authorId);
+      console.log('✅ In-app notifications created');
 
       // 🚫 Discord: NO author — only title, category, difficulty
-      await sendNewChallenge(challengeTitle, category, difficulty);
+      try {
+        await sendNewChallenge(challengeTitle, category, difficulty);
+        console.log('✅ Discord notification sent');
+      } catch (discordError) {
+        console.error('❌ Discord error:', discordError.message);
+      }
 
+      // Send emails
       await this.emailNewChallenge(challengeTitle, authorUsername, authorId);
+      console.log('✅ Emails sent');
 
-      console.log(`New challenge notification sent for: ${challengeTitle} [${category} / ${difficulty}]`);
+      console.log(`✅ New challenge notification completed: ${challengeTitle} [${category}/${difficulty}]`);
     } catch (error) {
-      console.error('Error sending new challenge notification:', error);
+      console.error('❌ Error sending new challenge notification:', error);
+      console.error('Stack:', error.stack);
     }
   }
 
