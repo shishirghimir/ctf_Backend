@@ -4,6 +4,7 @@ const axios = require('axios');
 const bcrypt = require('bcryptjs');
 const upload = require('../middleware/multerConfig');
 const verifyToken = require('../middleware/auth'); // ✅ JWT from cookie
+const { requireAdmin } = require('../middleware/auth');
 const { sendResetOtpEmail } = require('../utils/mailer');
 
 const {
