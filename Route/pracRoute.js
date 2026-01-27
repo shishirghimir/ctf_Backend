@@ -22,7 +22,21 @@ const User = require('../model/usermodel');
 // ✅ User Routes
 router.post('/users', createUsers);
 router.post('/register', createUsers); // Add registration endpoint
-router.put('/users/:id', updateUsers);
+router.put('/users/:id', verifyToken, async (req, res, next) => {
+  try {
+    const userId = parseInt(req.params.id);
+
+    // If user is not admin and tries to update someone else → deny
+    if (!req.user.isAdmin && req.user.id !== userId) {
+      return res.status(403).json({ message: '❌ You can only update your own account' });
+    }
+
+    // Call the controller normally
+    await updateUsers(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 router.delete('/users/:id', verifyToken,
   requireAdmin, deleteUsers);
 router.post('/login', loginUser);
