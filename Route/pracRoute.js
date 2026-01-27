@@ -22,7 +22,8 @@ const User = require('../model/usermodel');
 router.post('/users', createUsers);
 router.post('/register', createUsers); // Add registration endpoint
 router.put('/users/:id', updateUsers);
-router.delete('/users/:id', deleteUsers);
+router.delete('/users/:id', verifyToken,
+  requireAdmin, deleteUsers);
 router.post('/login', loginUser);
 router.post('/logout', logoutUser);
 router.get('/users', getAllUsers);
