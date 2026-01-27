@@ -27,7 +27,8 @@ router.delete('/users/:id', verifyToken,
   requireAdmin, deleteUsers);
 router.post('/login', loginUser);
 router.post('/logout', logoutUser);
-router.get('/users', getAllUsers);
+router.get('/users', verifyToken,
+  requireAdmin, getAllUsers);
 
 // Profile Image Upload removed - no longer needed
 
