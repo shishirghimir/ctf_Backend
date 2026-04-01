@@ -1,9 +1,9 @@
 const axios = require("axios");
 
-// Your webhooks
+// Webhooks loaded from environment variables
 const WEBHOOKS = {
-  firstBlood: "https://discord.com/api/webhooks/1445795721881325731/b5V3RQbdLB0ZfNV_O3ivkNKTCDTOUcwB40J1Qeoqly-k-SDkXFTVLFyVhzF4cxGIS82h",
-  challenge: "https://discord.com/api/webhooks/1445795960583225550/aM2M6IjDiRVtuyDDdfK4-i-otNmcE5ROpgPcy4AVO3F1YI5GscUWDiVGhUwXWpQGyI_c"
+  firstBlood: process.env.DISCORD_WEBHOOK_BLOOD || "",
+  challenge: process.env.DISCORD_WEBHOOK_CHALLENGE || ""
 };
 
 // Random flavor texts
@@ -18,6 +18,22 @@ const FIRST_BLOOD_TEXTS = [
   "Unstoppable! 🚀"
 ];
 
+const SECOND_BLOOD_TEXTS = [
+  "Hot on the heels of first blood! 🏃",
+  "Silver speed! 🥈",
+  "Close but not close enough! ⚔️",
+  "Strong performance! 💪",
+  "Second, but still elite! 🌟"
+];
+
+const THIRD_BLOOD_TEXTS = [
+  "Bronze glory! 🥉",
+  "The podium is complete! 🏆",
+  "Third blood drawn! 🗡️",
+  "Still in the top 3! 🎯",
+  "Respectable finish! 👏"
+];
+
 const CHALLENGE_TEXTS = [
   "Can you be the first to solve it?",
   "Time to show your skills! 💪",
@@ -29,17 +45,15 @@ const CHALLENGE_TEXTS = [
   "The gauntlet has been thrown! 🔥"
 ];
 
-/**
- * Get random text from array
- */
 function getRandomText(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-/**
- * Sends Discord embed message
- */
 async function sendDiscordEmbed(webhook, embed) {
+  if (!webhook) {
+    console.warn("⚠️ Discord webhook not configured, skipping notification");
+    return false;
+  }
   try {
     await axios.post(webhook, { embeds: [embed] });
     console.log("✅ Discord notification sent successfully");
@@ -50,9 +64,11 @@ async function sendDiscordEmbed(webhook, embed) {
   }
 }
 
+const BANNER_IMAGE = "https://i.imgur.com/OBiq3ap.png";
+
 module.exports = {
   /**
-   * 🔥 FIRST BLOOD — EPIC, BOLD, CLEAN
+   * 🥇 FIRST BLOOD
    */
   async sendFirstBlood(solverUsername, challengeTitle) {
     try {
@@ -63,15 +79,13 @@ module.exports = {
         fields: [
           { name: "🎯 Challenge", value: `# **${challengeTitle}**`, inline: false },
           { name: "\u200B", value: `*${getRandomText(FIRST_BLOOD_TEXTS)}*`, inline: false },
-          { name: "⚔️ Achievement", value: "`FIRST BLOOD`", inline: true },
+          { name: "⚔️ Achievement", value: "`FIRST BLOOD`  •  **+50% bonus**", inline: true },
           { name: "👤 Solver", value: `**${solverUsername}**`, inline: true }
         ],
-        image: {
-          url: "https://i.imgur.com/OBiq3ap.png"
-        },
+        image: { url: BANNER_IMAGE },
         footer: {
           text: "🔥 NETANIX CTF • First Blood Event",
-          icon_url: "https://i.imgur.com/OBiq3ap.png"
+          icon_url: BANNER_IMAGE
         },
         timestamp: new Date().toISOString()
       };
@@ -83,25 +97,68 @@ module.exports = {
   },
 
   /**
-   * 🩸 BLOOD NOTIFICATION — FIRST BLOOD ONLY
+   * 🥈 SECOND BLOOD
    */
-  async sendBloodNotification(solveCount, solverUsername, challengeTitle) {
+  async sendSecondBlood(solverUsername, challengeTitle) {
     try {
-      if (solveCount === 1) return await this.sendFirstBlood(solverUsername, challengeTitle);
-      return false;
+      const embed = {
+        title: `🥈 **SECOND BLOOD!**`,
+        description: `## **${solverUsername}**\n\n> *Claimed second blood on:*`,
+        color: 0xC0C0C0,
+        fields: [
+          { name: "🎯 Challenge", value: `**${challengeTitle}**`, inline: false },
+          { name: "\u200B", value: `*${getRandomText(SECOND_BLOOD_TEXTS)}*`, inline: false },
+          { name: "⚔️ Achievement", value: "`SECOND BLOOD`  •  **+25% bonus**", inline: true },
+          { name: "👤 Solver", value: `**${solverUsername}**`, inline: true }
+        ],
+        image: { url: BANNER_IMAGE },
+        footer: {
+          text: "🔥 NETANIX CTF • Blood Event",
+          icon_url: BANNER_IMAGE
+        },
+        timestamp: new Date().toISOString()
+      };
+      return await sendDiscordEmbed(WEBHOOKS.firstBlood, embed);
     } catch (err) {
-      console.error("Error in sendBloodNotification:", err);
+      console.error("Error in sendSecondBlood:", err);
       return false;
     }
   },
 
   /**
-   * 🧩 NEW CHALLENGE — CLEAN STRUCTURE
+   * 🥉 THIRD BLOOD
+   */
+  async sendThirdBlood(solverUsername, challengeTitle) {
+    try {
+      const embed = {
+        title: `🥉 **THIRD BLOOD!**`,
+        description: `## **${solverUsername}**\n\n> *Claimed third blood on:*`,
+        color: 0xCD7F32,
+        fields: [
+          { name: "🎯 Challenge", value: `**${challengeTitle}**`, inline: false },
+          { name: "\u200B", value: `*${getRandomText(THIRD_BLOOD_TEXTS)}*`, inline: false },
+          { name: "⚔️ Achievement", value: "`THIRD BLOOD`  •  **+10% bonus**", inline: true },
+          { name: "👤 Solver", value: `**${solverUsername}**`, inline: true }
+        ],
+        image: { url: BANNER_IMAGE },
+        footer: {
+          text: "🔥 NETANIX CTF • Blood Event",
+          icon_url: BANNER_IMAGE
+        },
+        timestamp: new Date().toISOString()
+      };
+      return await sendDiscordEmbed(WEBHOOKS.firstBlood, embed);
+    } catch (err) {
+      console.error("Error in sendThirdBlood:", err);
+      return false;
+    }
+  },
+
+  /**
+   * 🧩 NEW CHALLENGE
    */
   async sendNewChallenge(challengeTitle) {
     try {
-      console.log(`🎯 Sending New Challenge: ${challengeTitle}`);
-
       const embed = {
         title: `🔥 **NEW CHALLENGE UNLOCKED!**`,
         description: `## 🎯 **${challengeTitle}**\n\n> *A new challenge has dropped!*`,
@@ -109,15 +166,10 @@ module.exports = {
         fields: [
           { name: "\u200B", value: `**${getRandomText(CHALLENGE_TEXTS)}**`, inline: false }
         ],
-        image: {
-          url: "https://i.imgur.com/HavGjsW.png"  // ✅ Fixed: direct image URL
-        },
-        footer: {
-          text: "🧩 NETANIX CTF • New Challenge",
-        },
+        image: { url: "https://i.imgur.com/HavGjsW.png" },
+        footer: { text: "🧩 NETANIX CTF • New Challenge" },
         timestamp: new Date().toISOString()
       };
-
       return await sendDiscordEmbed(WEBHOOKS.challenge, embed);
     } catch (err) {
       console.error("Error in sendNewChallenge:", err);
@@ -126,7 +178,7 @@ module.exports = {
   },
 
   /**
-   * 🏅 CHALLENGE SOLVED
+   * ✅ CHALLENGE SOLVED
    */
   async sendChallengeSolved(solverUsername, challengeTitle, solveCount = null) {
     try {
@@ -135,15 +187,9 @@ module.exports = {
         description: `**${solverUsername}** just solved **${challengeTitle}**! 🎉`,
         color: 0x00D166,
         fields: solveCount ? [
-          {
-            name: "🔢 Total Solves",
-            value: `${solveCount} solver${solveCount !== 1 ? 's' : ''}`,
-            inline: true
-          }
+          { name: "🔢 Total Solves", value: `${solveCount} solver${solveCount !== 1 ? 's' : ''}`, inline: true }
         ] : [],
-        footer: {
-          text: "NETANIX CTF"
-        },
+        footer: { text: "NETANIX CTF" },
         timestamp: new Date().toISOString()
       };
       return await sendDiscordEmbed(WEBHOOKS.challenge, embed);

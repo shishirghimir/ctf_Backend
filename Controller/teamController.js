@@ -306,9 +306,20 @@ const leaveTeam = async (req, res) => {
   }
 };
 
-// Get team scoreboard - only show teams that have solved team challenges
+// Get team scoreboard - only available when a tournament is active
 const getTeamScoreboard = async (req, res) => {
   try {
+    // Lock scoreboard when no tournament is running
+    const activeTournament = await Tournament.findOne({ where: { isActive: true } });
+    if (!activeTournament) {
+      return res.status(200).json({
+        success: true,
+        tournamentActive: false,
+        data: { teams: [] },
+        message: 'No active tournament. Scoreboard unlocks when a tournament starts.'
+      });
+    }
+
     // Get teams that have at least one TeamScore record (solved at least one team challenge)
     const teams = await Team.findAll({
       where: { isActive: true },
@@ -324,20 +335,17 @@ const getTeamScoreboard = async (req, res) => {
           required: true // This ensures only teams with TeamScore records are included
         }
       ],
-      attributes: ['id', 'name', 'currentMembers', 'maxMembers', 'createdAt']
+      attributes: ['id', 'name', 'totalPoints', 'currentMembers', 'maxMembers', 'createdAt']
     });
 
-    // Calculate total points for each team from their TeamScore records
+    // Use Team.totalPoints directly — it's always kept in sync (hint deductions included)
     const teamsWithCalculatedPoints = teams.map(team => {
       const teamData = team.toJSON();
-      const totalPoints = teamData.TeamScores ? 
-        teamData.TeamScores.reduce((sum, score) => sum + (score.finalPoints || 0), 0) : 0;
-      
       return {
         ...teamData,
-        totalPoints: totalPoints,
+        totalPoints: teamData.totalPoints || 0,
         solvedChallenges: teamData.TeamScores ? teamData.TeamScores.length : 0,
-        lastSolveAt: teamData.TeamScores && teamData.TeamScores.length > 0 ? 
+        lastSolveAt: teamData.TeamScores && teamData.TeamScores.length > 0 ?
           Math.max(...teamData.TeamScores.map(s => new Date(s.solvedAt).getTime())) : null
       };
     });
@@ -363,6 +371,12 @@ const getTeamScoreboard = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      tournamentActive: true,
+      tournament: {
+        id: activeTournament.id,
+        name: activeTournament.name,
+        endTime: activeTournament.endTime
+      },
       data: { teams: rankedTeams }
     });
   } catch (error) {
@@ -783,6 +797,27 @@ const startTournament = async (req, res) => {
       { tournamentMode: true },
       { where: {} }
     );
+
+    // ── Reset all team scores for a fresh tournament start ──
+    // 1. Wipe all TeamScore solve records
+    await TeamScore.destroy({ where: {} });
+    // 2. Reset every team's points and hint counter to zero
+    await Team.update(
+      { totalPoints: 0, hintsUsed: 0 },
+      { where: {} }
+    );
+    // 3. Reset blood tracking on team/tournament challenges so 1st/2nd/3rd blood can be earned fresh
+    const { Op } = require('sequelize');
+    await Challenge.update(
+      {
+        firstSolverId: null,  firstSolvedAt: null,
+        secondSolverId: null, secondSolvedAt: null,
+        thirdSolverId: null,  thirdSolvedAt: null,
+        solveCount: 0
+      },
+      { where: { [Op.or]: [{ isTeamChallenge: true }, { tournamentOnly: true }] } }
+    );
+    // ────────────────────────────────────────────────────────
 
     // Set up auto-end timer
     setTimeout(async () => {

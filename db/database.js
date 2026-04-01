@@ -313,7 +313,11 @@ const connectDB = async () => {
       'ALTER TABLE Challenges ADD COLUMN showInSolo BOOLEAN DEFAULT TRUE',
       'ALTER TABLE Challenges ADD COLUMN hint2 TEXT',
       'ALTER TABLE Challenges ADD COLUMN maxHints INT DEFAULT 2',
-      'ALTER TABLE Challenges ADD COLUMN hintPenalty INT DEFAULT 50'
+      'ALTER TABLE Challenges ADD COLUMN hintPenalty INT DEFAULT 50',
+      'ALTER TABLE Challenges ADD COLUMN secondSolverId INT',
+      'ALTER TABLE Challenges ADD COLUMN secondSolvedAt DATETIME',
+      'ALTER TABLE Challenges ADD COLUMN thirdSolverId INT',
+      'ALTER TABLE Challenges ADD COLUMN thirdSolvedAt DATETIME'
     ];
 
     for (const columnQuery of challengeColumns) {
@@ -337,6 +341,42 @@ const connectDB = async () => {
       // Ignore error if constraint already exists
       console.log('Challenge foreign key constraint already exists or cannot be added');
     });
+
+    // Update Submissions table to add missing fields
+    const submissionColumns = [
+      'ALTER TABLE Submissions ADD COLUMN submittedFlag VARCHAR(255)',
+      'ALTER TABLE Submissions ADD COLUMN ipAddress VARCHAR(45)',
+      'ALTER TABLE Submissions ADD COLUMN userAgent TEXT',
+      'ALTER TABLE Submissions ADD COLUMN isFirstSolve BOOLEAN DEFAULT FALSE',
+      'ALTER TABLE Submissions ADD COLUMN isSecondSolve BOOLEAN DEFAULT FALSE',
+      'ALTER TABLE Submissions ADD COLUMN isThirdSolve BOOLEAN DEFAULT FALSE',
+      'ALTER TABLE Submissions ADD COLUMN solveTime INT'
+    ];
+
+    for (const columnQuery of submissionColumns) {
+      try {
+        await sequelize.query(columnQuery);
+      } catch (error) {
+        if (!error.message.includes('Duplicate column name')) {
+          console.log(`Submission column might already exist: ${error.message}`);
+        }
+      }
+    }
+
+    // Add FK constraints for secondSolverId and thirdSolverId
+    await sequelize.query(`
+      ALTER TABLE Challenges
+      ADD CONSTRAINT fk_challenges_secondSolverId
+      FOREIGN KEY (secondSolverId) REFERENCES Users(id)
+      ON DELETE SET NULL;
+    `).catch(() => {});
+
+    await sequelize.query(`
+      ALTER TABLE Challenges
+      ADD CONSTRAINT fk_challenges_thirdSolverId
+      FOREIGN KEY (thirdSolverId) REFERENCES Users(id)
+      ON DELETE SET NULL;
+    `).catch(() => {});
 
     // Tournaments table
     await sequelize.query(`

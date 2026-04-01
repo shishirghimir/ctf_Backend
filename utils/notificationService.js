@@ -1,6 +1,6 @@
 const { User, Notification } = require('../model/index');
 const { transporter, buildBaseEmail } = require('./mailer');
-const { sendFirstBlood, sendNewChallenge } = require('./discord');
+const { sendFirstBlood, sendSecondBlood, sendThirdBlood, sendNewChallenge } = require('./discord');
 
 const FROM_EMAIL = process.env.MAIL_FROM_EMAIL || process.env.SMTP_USER;
 const FROM_NAME = process.env.MAIL_FROM_NAME || 'Netanix Portal';
@@ -87,6 +87,40 @@ class NotificationService {
     } catch (error) {
       console.error('❌ Error sending first blood notification:', error);
       console.error('Stack:', error.stack);
+    }
+  }
+
+  // ================= SECOND BLOOD =================
+  static async notifySecondBlood(challengeTitle, solverUsername, challengeId, solverId) {
+    try {
+      const title = '🥈 Second Blood!';
+      const message = `${solverUsername} got second blood on "${challengeTitle}"!`;
+      const data = { challengeId, solverId, challengeTitle, solverUsername };
+      await this.createGlobalNotification('first_blood', title, message, data, solverId);
+      try {
+        await sendSecondBlood(solverUsername, challengeTitle);
+      } catch (discordError) {
+        console.error('❌ Discord error (2nd blood):', discordError.message);
+      }
+    } catch (error) {
+      console.error('❌ Error sending second blood notification:', error);
+    }
+  }
+
+  // ================= THIRD BLOOD =================
+  static async notifyThirdBlood(challengeTitle, solverUsername, challengeId, solverId) {
+    try {
+      const title = '🥉 Third Blood!';
+      const message = `${solverUsername} got third blood on "${challengeTitle}"!`;
+      const data = { challengeId, solverId, challengeTitle, solverUsername };
+      await this.createGlobalNotification('first_blood', title, message, data, solverId);
+      try {
+        await sendThirdBlood(solverUsername, challengeTitle);
+      } catch (discordError) {
+        console.error('❌ Discord error (3rd blood):', discordError.message);
+      }
+    } catch (error) {
+      console.error('❌ Error sending third blood notification:', error);
     }
   }
 

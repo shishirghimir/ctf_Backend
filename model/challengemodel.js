@@ -14,6 +14,10 @@ const Challenge = sequelize.define('Challenge', {
   solveCount: { type: DataTypes.INTEGER, defaultValue: 0 },
   firstSolverId: { type: DataTypes.INTEGER, allowNull: true },
   firstSolvedAt: { type: DataTypes.DATE, allowNull: true },
+  secondSolverId: { type: DataTypes.INTEGER, allowNull: true },
+  secondSolvedAt: { type: DataTypes.DATE, allowNull: true },
+  thirdSolverId: { type: DataTypes.INTEGER, allowNull: true },
+  thirdSolvedAt: { type: DataTypes.DATE, allowNull: true },
   difficulty: { type: DataTypes.ENUM('Easy', 'Medium', 'Hard', 'Expert'), defaultValue: 'Medium' },
   isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
   maxAttempts: { type: DataTypes.INTEGER, defaultValue: null }, // null = unlimited

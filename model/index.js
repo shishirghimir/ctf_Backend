@@ -37,9 +37,15 @@ function initializeModels() {
   Challenge.hasMany(Attempt, { foreignKey: 'challengeId', onDelete: 'CASCADE' });
   Attempt.belongsTo(Challenge, { foreignKey: 'challengeId' });
 
-  // First Solver relationship
+  // First / Second / Third Solver relationships
   Challenge.belongsTo(User, { as: 'FirstSolver', foreignKey: 'firstSolverId' });
   User.hasMany(Challenge, { as: 'FirstSolves', foreignKey: 'firstSolverId' });
+
+  Challenge.belongsTo(User, { as: 'SecondSolver', foreignKey: 'secondSolverId' });
+  User.hasMany(Challenge, { as: 'SecondSolves', foreignKey: 'secondSolverId' });
+
+  Challenge.belongsTo(User, { as: 'ThirdSolver', foreignKey: 'thirdSolverId' });
+  User.hasMany(Challenge, { as: 'ThirdSolves', foreignKey: 'thirdSolverId' });
 
   // Author relationship removed: DB does not have an author column on Challenges
 

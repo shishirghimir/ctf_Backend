@@ -9,6 +9,8 @@ const Submission = sequelize.define('Submission', {
   ipAddress: { type: DataTypes.STRING(45), allowNull: true }, // IPv4/IPv6 support
   userAgent: { type: DataTypes.TEXT, allowNull: true },
   isFirstSolve: { type: DataTypes.BOOLEAN, defaultValue: false },
+  isSecondSolve: { type: DataTypes.BOOLEAN, defaultValue: false },
+  isThirdSolve: { type: DataTypes.BOOLEAN, defaultValue: false },
   solveTime: { type: DataTypes.INTEGER, allowNull: true }, // Time taken to solve in seconds
 }, { 
   timestamps: true,

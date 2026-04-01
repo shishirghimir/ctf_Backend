@@ -439,12 +439,9 @@ router.get('/challenges/:id', async (req, res) => {
       attributes: { exclude: ['flagHash'] },
       include: [
         { model: Category, attributes: ['id', 'name'] },
-        {
-          model: User,
-          as: 'FirstSolver',
-          attributes: ['username'],
-          required: false
-        }
+        { model: User, as: 'FirstSolver', attributes: ['username'], required: false },
+        { model: User, as: 'SecondSolver', attributes: ['username'], required: false },
+        { model: User, as: 'ThirdSolver', attributes: ['username'], required: false }
       ],
     });
     
@@ -461,9 +458,9 @@ router.get('/challenges/:id', async (req, res) => {
 
     const challengeData = {
       ...ch.toJSON(),
-      firstSolver: ch.FirstSolver ? {
-        username: ch.FirstSolver.username
-      } : null,
+      firstSolver: ch.FirstSolver ? { username: ch.FirstSolver.username } : null,
+      secondSolver: ch.SecondSolver ? { username: ch.SecondSolver.username } : null,
+      thirdSolver: ch.ThirdSolver ? { username: ch.ThirdSolver.username } : null,
       recentSolvers: recentSolvers.map(s => ({
         username: s.User.username,
         solvedAt: s.createdAt
@@ -537,6 +534,7 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
     if (!ch || !ch.isActive) return res.status(404).json({ message: 'Challenge not found' });
 
     const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
     const team = user.teamId ? await Team.findByPk(user.teamId) : null;
 
     const activeTournament = await Tournament.findOne({ where: { isActive: true } });
@@ -593,6 +591,8 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
 
       let pointsAwarded = 0;
       let isFirstSolve = false;
+      let isSecondSolve = false;
+      let isThirdSolve = false;
 
       if (correct) {
         pointsAwarded = ch.points;
@@ -600,6 +600,16 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
           isFirstSolve = true;
           pointsAwarded = Math.floor(ch.points * 1.5);
           await Challenge.update({ firstSolverId: user.id, firstSolvedAt: new Date(), solveCount: 1 }, { where: { id: ch.id } });
+        } else if (!ch.secondSolverId) {
+          isSecondSolve = true;
+          pointsAwarded = Math.floor(ch.points * 1.25);
+          await Challenge.update({ secondSolverId: user.id, secondSolvedAt: new Date() }, { where: { id: ch.id } });
+          await Challenge.increment('solveCount', { where: { id: ch.id } });
+        } else if (!ch.thirdSolverId) {
+          isThirdSolve = true;
+          pointsAwarded = Math.floor(ch.points * 1.1);
+          await Challenge.update({ thirdSolverId: user.id, thirdSolvedAt: new Date() }, { where: { id: ch.id } });
+          await Challenge.increment('solveCount', { where: { id: ch.id } });
         } else {
           await Challenge.increment('solveCount', { where: { id: ch.id } });
         }
@@ -623,18 +633,34 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
         await Team.increment('totalPoints', { by: finalPoints, where: { id: team.id } });
         await Attempt.destroy({ where: { userId: user.id, challengeId: ch.id } });
 
-        // 🩸 TEAM FIRST BLOOD — Discord + In-App Notification
-        if (isFirstSolve) {
+        // 🩸 TEAM BLOOD NOTIFICATIONS
+        if (isFirstSolve || isSecondSolve || isThirdSolve) {
           setImmediate(async () => {
             try {
               const solverLabel = `${user.username} [Team: ${team.name}]`;
-              console.log(`🩸 TEAM FIRST BLOOD: ${solverLabel} on "${ch.title}"`);
-              await NotificationService.notifyFirstBlood(ch.title, solverLabel, ch.id, user.id);
+              if (isFirstSolve) {
+                console.log(`🩸 TEAM FIRST BLOOD: ${solverLabel} on "${ch.title}"`);
+                await NotificationService.notifyFirstBlood(ch.title, solverLabel, ch.id, user.id);
+              } else if (isSecondSolve) {
+                console.log(`🩸 TEAM SECOND BLOOD: ${solverLabel} on "${ch.title}"`);
+                await NotificationService.notifySecondBlood(ch.title, solverLabel, ch.id, user.id);
+              } else if (isThirdSolve) {
+                console.log(`🩸 TEAM THIRD BLOOD: ${solverLabel} on "${ch.title}"`);
+                await NotificationService.notifyThirdBlood(ch.title, solverLabel, ch.id, user.id);
+              }
             } catch (err) {
-              console.error('❌ Team first blood notification failed:', err.message);
+              console.error('❌ Team blood notification failed:', err.message);
             }
           });
         }
+
+        const bloodMessage = isFirstSolve
+          ? `🥇 First Blood! Your team is FIRST to solve this challenge! (+${finalPoints} pts)`
+          : isSecondSolve
+          ? `🥈 Second Blood! Your team is 2nd to solve this challenge! (+${finalPoints} pts)`
+          : isThirdSolve
+          ? `🥉 Third Blood! Your team is 3rd to solve this challenge! (+${finalPoints} pts)`
+          : `✅ Correct! Your team earned ${finalPoints} points!`;
 
         return res.json({
           correct: true,
@@ -642,9 +668,11 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
           originalPoints: pointsAwarded,
           hintPenalty: totalHintPenalty,
           isFirstSolve,
+          isSecondSolve,
+          isThirdSolve,
           isTeamChallenge: true,
           teamName: team.name,
-          message: isFirstSolve ? `🎉 Congratulations! Your team is FIRST to solve this challenge!` : `✅ Correct! Your team earned ${finalPoints} points!`
+          message: bloodMessage
         });
       } else {
         return res.json({ correct: false, pointsAwarded: 0, remainingAttempts: 3 - (rateLimitCheck.attemptCount || 1), isTeamChallenge: true, message: '❌ Incorrect flag.' });
@@ -657,6 +685,8 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
 
     let pointsAwarded = 0;
     let isFirstSolve = false;
+    let isSecondSolve = false;
+    let isThirdSolve = false;
 
     if (correct) {
       pointsAwarded = ch.points;
@@ -664,6 +694,16 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
         isFirstSolve = true;
         pointsAwarded = Math.floor(ch.points * 1.5);
         await Challenge.update({ firstSolverId: user.id, firstSolvedAt: new Date(), solveCount: 1 }, { where: { id: ch.id } });
+      } else if (!ch.secondSolverId) {
+        isSecondSolve = true;
+        pointsAwarded = Math.floor(ch.points * 1.25);
+        await Challenge.update({ secondSolverId: user.id, secondSolvedAt: new Date() }, { where: { id: ch.id } });
+        await Challenge.increment('solveCount', { where: { id: ch.id } });
+      } else if (!ch.thirdSolverId) {
+        isThirdSolve = true;
+        pointsAwarded = Math.floor(ch.points * 1.1);
+        await Challenge.update({ thirdSolverId: user.id, thirdSolvedAt: new Date() }, { where: { id: ch.id } });
+        await Challenge.increment('solveCount', { where: { id: ch.id } });
       } else {
         await Challenge.increment('solveCount', { where: { id: ch.id } });
       }
@@ -680,27 +720,47 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
       submittedFlag: providedHash,
       ipAddress,
       userAgent,
-      isFirstSolve
+      isFirstSolve,
+      isSecondSolve,
+      isThirdSolve
     });
 
-    // 🩸 SOLO FIRST BLOOD — Discord + In-App Notification
-    if (isFirstSolve) {
+    // 🩸 SOLO BLOOD NOTIFICATIONS
+    if (isFirstSolve || isSecondSolve || isThirdSolve) {
       setImmediate(async () => {
         try {
-          console.log(`🩸 SOLO FIRST BLOOD: ${user.username} on "${ch.title}"`);
-          await NotificationService.notifyFirstBlood(ch.title, user.username, ch.id, user.id);
+          if (isFirstSolve) {
+            console.log(`🩸 SOLO FIRST BLOOD: ${user.username} on "${ch.title}"`);
+            await NotificationService.notifyFirstBlood(ch.title, user.username, ch.id, user.id);
+          } else if (isSecondSolve) {
+            console.log(`🩸 SOLO SECOND BLOOD: ${user.username} on "${ch.title}"`);
+            await NotificationService.notifySecondBlood(ch.title, user.username, ch.id, user.id);
+          } else if (isThirdSolve) {
+            console.log(`🩸 SOLO THIRD BLOOD: ${user.username} on "${ch.title}"`);
+            await NotificationService.notifyThirdBlood(ch.title, user.username, ch.id, user.id);
+          }
         } catch (err) {
-          console.error('❌ Solo first blood notification failed:', err.message);
+          console.error('❌ Solo blood notification failed:', err.message);
         }
       });
     }
+
+    const bloodMessage = isFirstSolve
+      ? '🥇 First Blood! You are FIRST to solve this challenge!'
+      : isSecondSolve
+      ? '🥈 Second Blood! You are 2nd to solve this challenge!'
+      : isThirdSolve
+      ? '🥉 Third Blood! You are 3rd to solve this challenge!'
+      : '✅ Correct!';
 
     res.json({
       correct,
       pointsAwarded,
       remainingAttempts: 3 - (rateLimitCheck.attemptCount || 1),
       isFirstSolve,
-      message: correct ? (isFirstSolve ? '🎉 You are FIRST to solve this challenge!' : '✅ Correct!') : '❌ Incorrect flag.'
+      isSecondSolve,
+      isThirdSolve,
+      message: correct ? bloodMessage : '❌ Incorrect flag.'
     });
   } catch (e) {
     console.error('Submission error:', e);
@@ -746,22 +806,27 @@ router.get('/user/solved', verifyToken, async (req, res) => {
 // -------- Enhanced Global Scoreboard --------
 router.get('/scoreboard', async (req, res) => {
   try {
-    const { limit = 50, category } = req.query;
-    
+    const limitRaw = parseInt(req.query.limit, 10);
+    const safeLimit = (!isNaN(limitRaw) && limitRaw > 0 && limitRaw <= 200) ? limitRaw : 50;
+    const categoryRaw = parseInt(req.query.category, 10);
+    const safeCategory = !isNaN(categoryRaw) ? categoryRaw : null;
+
     let whereClause = 's.correct = true';
     let joinClause = `
       FROM Submissions s
       JOIN Users u ON s.userId = u.id
       JOIN Challenges c ON s.challengeId = c.id
     `;
-    
-    if (category) {
+    const queryReplacements = [];
+
+    if (safeCategory) {
       joinClause += ` JOIN Categories cat ON c.categoryId = cat.id`;
-      whereClause += ` AND cat.id = ${parseInt(category)}`;
+      whereClause += ` AND cat.id = ?`;
+      queryReplacements.push(safeCategory);
     }
 
     const [results] = await Submission.sequelize.query(`
-      SELECT 
+      SELECT
         s.userId,
         u.username,
         u.country,
@@ -774,8 +839,8 @@ router.get('/scoreboard', async (req, res) => {
       WHERE ${whereClause}
       GROUP BY s.userId, u.username, u.country, u.totalPoints
       ORDER BY totalPoints DESC, lastSolveAt ASC
-      LIMIT ${parseInt(limit)}
-    `);
+      LIMIT ${safeLimit}
+    `, { replacements: queryReplacements });
 
     const leaderboard = results.map((r, idx) => ({
       position: idx + 1,
