@@ -49,7 +49,6 @@ async function checkSubmissionRateLimit(userId, challengeId, ipAddress) {
   });
 
   if (!attempt) {
-    // First attempt for this user-challenge combination
     attempt = await Attempt.create({
       userId,
       challengeId,
@@ -60,7 +59,6 @@ async function checkSubmissionRateLimit(userId, challengeId, ipAddress) {
     return { allowed: true, remainingAttempts: 2, waitTime: 0 };
   }
 
-  // Check if user is currently blocked
   if (attempt.blockedUntil && now < attempt.blockedUntil) {
     const waitTime = Math.ceil((attempt.blockedUntil - now) / 1000);
     return { 
@@ -71,15 +69,12 @@ async function checkSubmissionRateLimit(userId, challengeId, ipAddress) {
     };
   }
 
-  // Reset block if time has passed
   if (attempt.blockedUntil && now >= attempt.blockedUntil) {
     attempt.attemptCount = 0;
     attempt.blockedUntil = null;
   }
 
-  // Check if within rate limit (3 attempts)
   if (attempt.attemptCount >= 3) {
-    // Block for 7 seconds
     attempt.blockedUntil = new Date(now.getTime() + 7000);
     await attempt.save();
     return { 
@@ -90,7 +85,6 @@ async function checkSubmissionRateLimit(userId, challengeId, ipAddress) {
     };
   }
 
-  // Increment attempt count
   attempt.attemptCount += 1;
   attempt.lastAttemptAt = now;
   attempt.ipAddress = ipAddress;
@@ -119,14 +113,12 @@ router.get('/admin/stats', verifyToken, requireAdmin, async (req, res) => {
       col: 'userId'
     });
 
-    // Recent challenges
     const recentChallenges = await Challenge.findAll({
       limit: 10,
       order: [['createdAt', 'DESC']],
       include: [{ model: Category, attributes: ['name'] }]
     });
 
-    // Recent activity
     const recentSubmissions = await Submission.findAll({
       limit: 10,
       order: [['createdAt', 'DESC']],
@@ -136,7 +128,6 @@ router.get('/admin/stats', verifyToken, requireAdmin, async (req, res) => {
       ]
     });
 
-    // Challenge difficulty distribution
     const difficultyStats = await Challenge.findAll({
       attributes: [
         'difficulty',
@@ -145,7 +136,6 @@ router.get('/admin/stats', verifyToken, requireAdmin, async (req, res) => {
       group: ['difficulty']
     });
 
-    // Top users (renamed from topSolvers to match AdminDashboard expectations)
     const topUsers = await User.findAll({
       attributes: ['username', 'totalPoints'],
       where: { totalPoints: { [Op.gt]: 0 } },
@@ -153,7 +143,6 @@ router.get('/admin/stats', verifyToken, requireAdmin, async (req, res) => {
       limit: 10
     });
 
-    // Most solved challenges
     const popularChallenges = await Challenge.findAll({
       attributes: ['title', 'solveCount', 'points'],
       order: [['solveCount', 'DESC']],
@@ -305,7 +294,6 @@ router.post('/challenges', verifyToken, requireAdmin, upload.single('file'), asy
       isActive: true
     });
 
-    // Fire-and-forget notifications so challenge creation responds fast
     setImmediate(async () => {
       try {
         const author = await User.findByPk(req.user.id, { attributes: ['username'] });
@@ -374,16 +362,14 @@ router.get('/challenges', async (req, res) => {
     const { category, difficulty, solved, limit, offset, page, pageSize } = req.query;
     const where = { 
       isActive: true,
-      // Exclude team challenges and tournament-only challenges from solo challenges
       isTeamChallenge: false,
       tournamentOnly: false,
-      showInSolo: true // Only show challenges meant for solo play
+      showInSolo: true
     };
 
     if (category) where.categoryId = category;
     if (difficulty) where.difficulty = difficulty;
 
-    // Pagination: support limit/offset or page/pageSize. Defaults for safety.
     const size = Math.min(parseInt(pageSize || limit || 40, 10) || 40, 100);
     const off = (() => {
       if (page) {
@@ -410,7 +396,6 @@ router.get('/challenges', async (req, res) => {
       offset: off
     });
 
-    // Add solve status if user is authenticated
     let enrichedList = list;
     if (req.headers.authorization || req.cookies?.token) {
       try {
@@ -436,11 +421,9 @@ router.get('/challenges', async (req, res) => {
           enrichedList = enrichedList.filter(c => !c.solved);
         }
       } catch (_) {
-        // Invalid token, continue without user-specific data
       }
     }
 
-    // Preserve array response for compatibility
     res
       .set({ 'X-Pagination-Limit': String(size), 'X-Pagination-Offset': String(off) })
       .json(enrichedList);
@@ -469,7 +452,6 @@ router.get('/challenges/:id', async (req, res) => {
       return res.status(404).json({ message: 'Challenge not found' });
     }
 
-    // Get recent solvers (last 5)
     const recentSolvers = await Submission.findAll({
       where: { challengeId: req.params.id, correct: true },
       include: [{ model: User, attributes: ['username'] }],
@@ -528,7 +510,6 @@ router.put('/challenges/:id', verifyToken, requireAdmin, upload.single('file'), 
 
 router.delete('/challenges/:id', verifyToken, requireAdmin, async (req, res) => {
   try {
-    // Soft delete by setting isActive to false
     const updated = await Challenge.update(
       { isActive: false },
       { where: { id: req.params.id } }
@@ -549,7 +530,6 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
 
     const sanitizedFlag = sanitizeInput(flag.trim());
 
-    // ✅ FIX: Always get IP safely
     const ipAddress = req.ip || req.headers['x-forwarded-for'] || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
 
@@ -586,14 +566,14 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
       }
 
       if (attempt.attemptCount >= 3) {
-        attempt.blockedUntil = new Date(now.getTime() + 7000); // block 7 sec
+        attempt.blockedUntil = new Date(now.getTime() + 7000);
         await attempt.save();
         return { blocked: true, waitTime: 7 };
       }
 
       attempt.attemptCount += 1;
       attempt.lastAttemptAt = now;
-      attempt.ipAddress = ipAddress; // ✅ always updated
+      attempt.ipAddress = ipAddress;
       await attempt.save();
       return attempt;
     }
@@ -643,6 +623,19 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
         await Team.increment('totalPoints', { by: finalPoints, where: { id: team.id } });
         await Attempt.destroy({ where: { userId: user.id, challengeId: ch.id } });
 
+        // 🩸 TEAM FIRST BLOOD — Discord + In-App Notification
+        if (isFirstSolve) {
+          setImmediate(async () => {
+            try {
+              const solverLabel = `${user.username} [Team: ${team.name}]`;
+              console.log(`🩸 TEAM FIRST BLOOD: ${solverLabel} on "${ch.title}"`);
+              await NotificationService.notifyFirstBlood(ch.title, solverLabel, ch.id, user.id);
+            } catch (err) {
+              console.error('❌ Team first blood notification failed:', err.message);
+            }
+          });
+        }
+
         return res.json({
           correct: true,
           pointsAwarded: finalPoints,
@@ -685,10 +678,22 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
       correct,
       pointsAwarded,
       submittedFlag: providedHash,
-      ipAddress, // ✅ fixed IP
+      ipAddress,
       userAgent,
       isFirstSolve
     });
+
+    // 🩸 SOLO FIRST BLOOD — Discord + In-App Notification
+    if (isFirstSolve) {
+      setImmediate(async () => {
+        try {
+          console.log(`🩸 SOLO FIRST BLOOD: ${user.username} on "${ch.title}"`);
+          await NotificationService.notifyFirstBlood(ch.title, user.username, ch.id, user.id);
+        } catch (err) {
+          console.error('❌ Solo first blood notification failed:', err.message);
+        }
+      });
+    }
 
     res.json({
       correct,
@@ -743,8 +748,6 @@ router.get('/scoreboard', async (req, res) => {
   try {
     const { limit = 50, category } = req.query;
     
-    // Build the query to get users with their actual totalPoints (which includes hint deductions)
-    // and their solve statistics from submissions
     let whereClause = 's.correct = true';
     let joinClause = `
       FROM Submissions s
@@ -805,7 +808,6 @@ router.get('/challenges/:id/stats', verifyToken, requireAdmin, async (req, res) 
       col: 'userId'
     });
 
-    // Submission timeline (last 30 days)
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const timeline = await Submission.findAll({
       where: {
@@ -848,7 +850,6 @@ router.get('/user/profile', verifyToken, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Get user's rank
     const [rankResult] = await User.sequelize.query(`
       SELECT COUNT(*) + 1 as rank
       FROM Users 
@@ -857,7 +858,6 @@ router.get('/user/profile', verifyToken, async (req, res) => {
     
     const userRank = rankResult[0]?.rank || null;
 
-    // Get solve statistics
     const solveStats = await Submission.findAll({
       where: { userId: req.user.id, correct: true },
       attributes: [
@@ -890,13 +890,11 @@ router.put('/user/profile', verifyToken, async (req, res) => {
 
     const { fullName, bio, country, website, githubUsername, twitterUsername } = req.body;
     
-    // Sanitize inputs
     if (fullName !== undefined) user.fullName = sanitizeInput(fullName);
     if (bio !== undefined) user.bio = sanitizeInput(bio);
     if (country !== undefined) user.country = sanitizeInput(country);
     if (website !== undefined) {
       const sanitizedWebsite = sanitizeInput(website);
-      // Basic URL validation
       if (sanitizedWebsite && !sanitizedWebsite.match(/^https?:\/\/.+/)) {
         return res.status(400).json({ message: 'Website must be a valid URL starting with http:// or https://' });
       }
@@ -907,7 +905,6 @@ router.put('/user/profile', verifyToken, async (req, res) => {
 
     await user.save();
     
-    // Return updated user without sensitive data
     const updatedUser = await User.findByPk(req.user.id, {
       attributes: { exclude: ['password', 'resetOtp', 'otpExpires', 'twoFactorSecret'] }
     });
@@ -956,7 +953,6 @@ router.get('/admin/audit', verifyToken, requireAdmin, async (req, res) => {
 });
 
 // -------- Notification Routes --------
-// Get user notifications
 router.get('/notifications', verifyToken, async (req, res) => {
   try {
     const { limit = 20, offset = 0 } = req.query;
@@ -971,7 +967,6 @@ router.get('/notifications', verifyToken, async (req, res) => {
   }
 });
 
-// Get unread notification count
 router.get('/notifications/unread-count', verifyToken, async (req, res) => {
   try {
     const count = await NotificationService.getUnreadCount(req.user.id);
@@ -981,7 +976,6 @@ router.get('/notifications/unread-count', verifyToken, async (req, res) => {
   }
 });
 
-// Mark notification as read
 router.put('/notifications/:id/read', verifyToken, async (req, res) => {
   try {
     const success = await NotificationService.markAsRead(req.params.id, req.user.id);
@@ -995,7 +989,6 @@ router.put('/notifications/:id/read', verifyToken, async (req, res) => {
   }
 });
 
-// Mark all notifications as read
 router.put('/notifications/read-all', verifyToken, async (req, res) => {
   try {
     const updatedCount = await NotificationService.markAllAsRead(req.user.id);
@@ -1012,7 +1005,6 @@ router.post('/challenges/:id/hint', verifyToken, async (req, res) => {
     const challengeId = req.params.id;
     const userId = req.user.id;
 
-    // Validate hint number
     if (!hintNumber || hintNumber < 1 || hintNumber > 2) {
       return res.status(400).json({
         success: false,
@@ -1028,7 +1020,6 @@ router.post('/challenges/:id/hint', verifyToken, async (req, res) => {
       });
     }
 
-    // Check if this is a team challenge (team challenges use different hint system)
     if (challenge.isTeamChallenge) {
       return res.status(400).json({
         success: false,
@@ -1036,7 +1027,6 @@ router.post('/challenges/:id/hint', verifyToken, async (req, res) => {
       });
     }
 
-    // Check if user has already solved this challenge
     const existingSubmission = await Submission.findOne({
       where: { userId: userId, challengeId: challengeId, correct: true }
     });
@@ -1048,13 +1038,11 @@ router.post('/challenges/:id/hint', verifyToken, async (req, res) => {
       });
     }
 
-    // Check if hint has already been unlocked
     const existingHint = await UserHint.findOne({
       where: { userId: userId, challengeId: challengeId, hintNumber: hintNumber }
     });
 
     if (existingHint) {
-      // Return the already unlocked hint without deducting points again
       const hintText = hintNumber === 1 ? challenge.hint : challenge.hint2;
       return res.status(200).json({
         success: true,
@@ -1068,7 +1056,6 @@ router.post('/challenges/:id/hint', verifyToken, async (req, res) => {
       });
     }
 
-    // Check if previous hint is unlocked (for hint 2)
     if (hintNumber === 2) {
       const firstHint = await UserHint.findOne({
         where: { userId: userId, challengeId: challengeId, hintNumber: 1 }
@@ -1082,7 +1069,6 @@ router.post('/challenges/:id/hint', verifyToken, async (req, res) => {
       }
     }
 
-    // Get hint text
     const hintText = hintNumber === 1 ? challenge.hint : challenge.hint2;
     if (!hintText) {
       return res.status(404).json({
@@ -1091,10 +1077,8 @@ router.post('/challenges/:id/hint', verifyToken, async (req, res) => {
       });
     }
 
-    // Calculate penalty
     const hintPenalty = challenge.hintPenalty || 50;
 
-    // Check if user has enough points
     const user = await User.findByPk(userId);
     const currentPoints = user.totalPoints || 0;
     
@@ -1105,7 +1089,6 @@ router.post('/challenges/:id/hint', verifyToken, async (req, res) => {
       });
     }
 
-    // Create hint record and deduct points
     await UserHint.create({
       userId: userId,
       challengeId: challengeId,
@@ -1113,7 +1096,6 @@ router.post('/challenges/:id/hint', verifyToken, async (req, res) => {
       pointsDeducted: hintPenalty
     });
 
-    // Update user's total points (deduct penalty)
     await User.update(
       { totalPoints: Math.max(0, currentPoints - hintPenalty) },
       { where: { id: userId } }
@@ -1137,12 +1119,12 @@ router.post('/challenges/:id/hint', verifyToken, async (req, res) => {
     });
   }
 });
+
 // -------- Admin: Get User Profile with Solved Challenges --------
 router.get('/admin/users/:id/profile', verifyToken, requireAdmin, async (req, res) => {
   try {
     const userId = req.params.id;
 
-    // Fetch user
     const user = await User.findByPk(userId, {
       attributes: ['id', 'username', 'email', 'isAdmin', 'totalPoints', 'createdAt']
     });
@@ -1150,7 +1132,6 @@ router.get('/admin/users/:id/profile', verifyToken, requireAdmin, async (req, re
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Fetch solved challenges via Submissions
     const solvedSubmissions = await Submission.findAll({
       where: { userId, correct: true },
       attributes: ['challengeId', 'pointsAwarded', 'createdAt', 'isFirstSolve'],
@@ -1181,4 +1162,5 @@ router.get('/admin/users/:id/profile', verifyToken, requireAdmin, async (req, re
     res.status(500).json({ message: 'Failed to load user profile' });
   }
 });
+
 module.exports = router;
