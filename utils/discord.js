@@ -65,8 +65,8 @@ async function sendDiscordEmbed(webhook, embed) {
 }
 
 const BANNER_IMAGE_FIRST  = "https://i.imgur.com/HavGjsW.png";
-const BANNER_IMAGE_SECOND = "https://i.imgur.com/HavGjsW.png"; // TODO: replace with 2nd blood image
-const BANNER_IMAGE_THIRD  = "https://i.imgur.com/HavGjsW.png"; // TODO: replace with 3rd blood image
+const BANNER_IMAGE_SECOND = "https://i.imgur.com/iWdDkjR.jpeg"; // TODO: replace with 2nd blood image
+const BANNER_IMAGE_THIRD  = "https://i.imgur.com/xVsMYRJ.jpeg"; // TODO: replace with 3rd blood image
 
 module.exports = {
   /**
