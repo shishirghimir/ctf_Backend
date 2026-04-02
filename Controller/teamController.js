@@ -2,9 +2,9 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const { Team, TeamMember, User, TeamScore, TeamHint, Challenge, RegistrationChallenge, Tournament } = require('../model');
 
-// Generate unique team code
+// Generate unique team code — 16-char hex (8 random bytes)
 const generateTeamCode = () => {
-  return crypto.randomBytes(4).toString('hex').toUpperCase();
+  return crypto.randomBytes(8).toString('hex').toUpperCase();
 };
 
 // Create a new team

@@ -357,6 +357,16 @@ router.get('/admin/challenges', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+// Public stats — challenge count only, no auth required
+router.get('/public/stats', async (req, res) => {
+  try {
+    const totalChallenges = await Challenge.count({ where: { isActive: true } });
+    res.json({ totalChallenges });
+  } catch (e) {
+    res.status(500).json({ totalChallenges: 0 });
+  }
+});
+
 router.get('/challenges', async (req, res) => {
   try {
     const { category, difficulty, solved, limit, offset, page, pageSize } = req.query;

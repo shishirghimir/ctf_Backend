@@ -5,11 +5,15 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const compression = require('compression');
 const fs = require('fs');
 const path = require('path');
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
+
+// Trust Railway's reverse proxy (fixes X-Forwarded-For / rate-limit warning)
+app.set('trust proxy', 1);
 
 // DB
 const { sequelize, connectDB } = require('./db/database');
@@ -17,6 +21,9 @@ const { initializeModels } = require('./model/index');
 
 // Multer config (uses Railway Volume if UPLOAD_DIR is set)
 const { upload, UPLOAD_DIR } = require('./middleware/multerConfig');
+
+// ---------- Compression (reduces payload by ~70%) ----------
+app.use(compression());
 
 // ---------- Security & parsing ----------
 app.use(helmet()); // Base helmet protection

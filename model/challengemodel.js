@@ -27,6 +27,7 @@ const Challenge = sequelize.define('Challenge', {
   hint2: { type: DataTypes.TEXT, allowNull: true }, // second hint
   maxHints: { type: DataTypes.INTEGER, defaultValue: 2 }, // maximum hints available
   hintPenalty: { type: DataTypes.INTEGER, defaultValue: 50 }, // points deducted per hint
+  imageUrl: { type: DataTypes.STRING(500), allowNull: true }, // optional banner image URL
 }, {
   timestamps: true,
   indexes: [

@@ -64,7 +64,9 @@ async function sendDiscordEmbed(webhook, embed) {
   }
 }
 
-const BANNER_IMAGE = "https://i.imgur.com/OBiq3ap.png";
+const BANNER_IMAGE_FIRST  = "https://i.imgur.com/HavGjsW.png";
+const BANNER_IMAGE_SECOND = "https://i.imgur.com/HavGjsW.png"; // TODO: replace with 2nd blood image
+const BANNER_IMAGE_THIRD  = "https://i.imgur.com/HavGjsW.png"; // TODO: replace with 3rd blood image
 
 module.exports = {
   /**
@@ -82,10 +84,10 @@ module.exports = {
           { name: "⚔️ Achievement", value: "`FIRST BLOOD`  •  **+50% bonus**", inline: true },
           { name: "👤 Solver", value: `**${solverUsername}**`, inline: true }
         ],
-        image: { url: BANNER_IMAGE },
+        image: { url: BANNER_IMAGE_FIRST },
         footer: {
           text: "🔥 NETANIX CTF • First Blood Event",
-          icon_url: BANNER_IMAGE
+          icon_url: BANNER_IMAGE_FIRST
         },
         timestamp: new Date().toISOString()
       };
@@ -102,19 +104,19 @@ module.exports = {
   async sendSecondBlood(solverUsername, challengeTitle) {
     try {
       const embed = {
-        title: `🥈 **SECOND BLOOD!**`,
-        description: `## **${solverUsername}**\n\n> *Claimed second blood on:*`,
+        title: `🥈 **SECOND BLOOD CLAIMED!**`,
+        description: `## 🥈 **${solverUsername}**\n\n> *Drew the second drop of blood on:*`,
         color: 0xC0C0C0,
         fields: [
-          { name: "🎯 Challenge", value: `**${challengeTitle}**`, inline: false },
+          { name: "🎯 Challenge", value: `# **${challengeTitle}**`, inline: false },
           { name: "\u200B", value: `*${getRandomText(SECOND_BLOOD_TEXTS)}*`, inline: false },
           { name: "⚔️ Achievement", value: "`SECOND BLOOD`  •  **+25% bonus**", inline: true },
           { name: "👤 Solver", value: `**${solverUsername}**`, inline: true }
         ],
-        image: { url: BANNER_IMAGE },
+        image: { url: BANNER_IMAGE_SECOND },
         footer: {
-          text: "🔥 NETANIX CTF • Blood Event",
-          icon_url: BANNER_IMAGE
+          text: "🔥 NETANIX CTF • Second Blood Event",
+          icon_url: BANNER_IMAGE_SECOND
         },
         timestamp: new Date().toISOString()
       };
@@ -131,19 +133,19 @@ module.exports = {
   async sendThirdBlood(solverUsername, challengeTitle) {
     try {
       const embed = {
-        title: `🥉 **THIRD BLOOD!**`,
-        description: `## **${solverUsername}**\n\n> *Claimed third blood on:*`,
+        title: `🥉 **THIRD BLOOD CLAIMED!**`,
+        description: `## 🥉 **${solverUsername}**\n\n> *Drew the third drop of blood on:*`,
         color: 0xCD7F32,
         fields: [
-          { name: "🎯 Challenge", value: `**${challengeTitle}**`, inline: false },
+          { name: "🎯 Challenge", value: `# **${challengeTitle}**`, inline: false },
           { name: "\u200B", value: `*${getRandomText(THIRD_BLOOD_TEXTS)}*`, inline: false },
           { name: "⚔️ Achievement", value: "`THIRD BLOOD`  •  **+10% bonus**", inline: true },
           { name: "👤 Solver", value: `**${solverUsername}**`, inline: true }
         ],
-        image: { url: BANNER_IMAGE },
+        image: { url: BANNER_IMAGE_THIRD },
         footer: {
-          text: "🔥 NETANIX CTF • Blood Event",
-          icon_url: BANNER_IMAGE
+          text: "🔥 NETANIX CTF • Third Blood Event",
+          icon_url: BANNER_IMAGE_THIRD
         },
         timestamp: new Date().toISOString()
       };

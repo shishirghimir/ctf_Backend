@@ -53,6 +53,12 @@ router.get('/me', verifyToken, (req, res) => {
   res.json(req.user);
 });
 
+// ✅ Server-side admin gate — requireAdmin checks DB directly, cannot be bypassed by response interception
+// Returns 200 only if the token belongs to a real DB-confirmed admin. Otherwise 403.
+router.get('/verify-admin', verifyToken, requireAdmin, (req, res) => {
+  res.json({ verified: true });
+});
+
 // ✅ Verify reCAPTCHA token (use env secret)
 router.post('/verify-recaptcha', async (req, res) => {
   const { token } = req.body;

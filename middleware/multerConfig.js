@@ -8,7 +8,11 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-  filename: (_req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)),
+  filename: (_req, file, cb) => {
+    // Strip any path traversal characters; keep only the extension
+    const ext = path.extname(file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
+    cb(null, Date.now() + '-' + Math.random().toString(36).slice(2, 8) + ext);
+  },
 });
 
 const allowed = [
@@ -19,8 +23,10 @@ const allowed = [
   'application/x-tar','application/gzip'
 ];
 const fileFilter = (_req, file, cb) => {
-  if (allowed.includes(file.mimetype) || !file.mimetype) return cb(null, true);
-  return cb(new Error('File type not allowed for CTF challenges'), false);
+  if (!file.mimetype || !allowed.includes(file.mimetype)) {
+    return cb(new Error('File type not allowed for CTF challenges'), false);
+  }
+  return cb(null, true);
 };
 
 const upload = multer({

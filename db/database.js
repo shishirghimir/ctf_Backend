@@ -317,8 +317,16 @@ const connectDB = async () => {
       'ALTER TABLE Challenges ADD COLUMN secondSolverId INT',
       'ALTER TABLE Challenges ADD COLUMN secondSolvedAt DATETIME',
       'ALTER TABLE Challenges ADD COLUMN thirdSolverId INT',
-      'ALTER TABLE Challenges ADD COLUMN thirdSolvedAt DATETIME'
+      'ALTER TABLE Challenges ADD COLUMN thirdSolvedAt DATETIME',
+      'ALTER TABLE Challenges ADD COLUMN imageUrl VARCHAR(500)'
     ];
+
+    // Expand teamCode column to VARCHAR(20) for stronger codes (safe on existing data)
+    await sequelize.query(
+      'ALTER TABLE Teams MODIFY COLUMN teamCode VARCHAR(20) NOT NULL'
+    ).catch(() => {
+      console.log('teamCode column already at VARCHAR(20) or larger');
+    });
 
     for (const columnQuery of challengeColumns) {
       try {

@@ -12,7 +12,7 @@ const verifyToken = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findByPk(decoded.id, {
-      attributes: ['id', 'username', 'email', 'isAdmin']
+      attributes: ['id', 'username', 'email', 'isAdmin', 'totalPoints', 'teamId']
     });
 
     if (!user) {
