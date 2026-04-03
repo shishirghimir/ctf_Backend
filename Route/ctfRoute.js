@@ -1357,8 +1357,8 @@ router.get('/solve-feed', async (req, res) => {
   }
 });
 
-// -------- Public profile --------
-router.get('/profile/:username', async (req, res) => {
+// -------- Public profile (login required) --------
+router.get('/profile/:username', verifyToken, async (req, res) => {
   try {
     // Validate username format — only allow alphanumeric + underscore + hyphen (max 50 chars)
     const rawUsername = req.params.username;
