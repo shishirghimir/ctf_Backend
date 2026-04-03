@@ -13,6 +13,15 @@ const createTeam = async (req, res) => {
     const { name, description, maxMembers = 5 } = req.body;
     const userId = req.user.id;
 
+    // Block team creation during active tournament
+    const activeTournament = await Tournament.findOne({ where: { isActive: true } });
+    if (activeTournament) {
+      return res.status(403).json({
+        success: false,
+        message: 'Team creation is locked while a tournament is running. Wait for it to end.'
+      });
+    }
+
     // Check if user is already in a team
     const existingUser = await User.findByPk(userId);
     if (existingUser.teamId) {
@@ -88,6 +97,15 @@ const joinTeam = async (req, res) => {
   try {
     const { teamCode, userName, userEmail } = req.body;
     const userId = req.user?.id;
+
+    // Block joining during active tournament
+    const activeTournament = await Tournament.findOne({ where: { isActive: true } });
+    if (activeTournament) {
+      return res.status(403).json({
+        success: false,
+        message: 'Joining a team is locked while a tournament is running. Wait for it to end.'
+      });
+    }
 
     // If user is logged in, use their ID, otherwise validate email/name
     if (!userId && (!userName || !userEmail)) {
