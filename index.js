@@ -22,6 +22,7 @@ const { initializeModels } = require('./model/index');
 // Multer config (uses Railway Volume if UPLOAD_DIR is set)
 const { upload, UPLOAD_DIR } = require('./middleware/multerConfig');
 const verifyToken = require('./middleware/auth');
+const { requireAdmin } = require('./middleware/auth');
 
 // ---------- Compression (reduces payload by ~70%) ----------
 app.use(compression());
@@ -80,7 +81,7 @@ app.use('/uploads', express.static(UPLOAD_DIR, {
 }));
 
 // ---------- Upload endpoint ----------
-app.post('/api/upload', verifyToken, upload.single('file'), async (req, res) => {
+app.post('/api/upload', verifyToken, requireAdmin, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ ok: false, error: 'No file uploaded' });
 

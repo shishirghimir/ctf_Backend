@@ -1360,40 +1360,47 @@ router.get('/solve-feed', async (req, res) => {
 // -------- Public profile --------
 router.get('/profile/:username', async (req, res) => {
   try {
+    // Block admin accounts from public profiles
     const user = await User.findOne({
-      where: { username: req.params.username },
+      where: { username: req.params.username, isAdmin: false },
       attributes: ['id', 'username', 'fullName', 'totalPoints', 'country', 'bio', 'website', 'githubUsername', 'twitterUsername', 'createdAt'],
     });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const [[rankRow]] = await User.sequelize.query(
-      'SELECT COUNT(*)+1 AS rank FROM Users WHERE totalPoints > (SELECT totalPoints FROM Users WHERE id = ?)',
-      { replacements: [user.id] }
-    );
+    // Run all sub-queries in parallel, gracefully degrade on failure
+    const [rankResult, solves, badges, categoryResult] = await Promise.allSettled([
+      User.sequelize.query(
+        'SELECT COUNT(*)+1 AS `rank` FROM Users WHERE totalPoints > (SELECT totalPoints FROM Users WHERE id = ?)',
+        { replacements: [user.id], type: 'SELECT' }
+      ),
+      Submission.findAll({
+        where: { userId: user.id, correct: true },
+        include: [{ model: Challenge, attributes: ['title', 'points', 'difficulty'], include: [{ model: Category, attributes: ['name'] }] }],
+        order: [['createdAt', 'DESC']],
+        limit: 10,
+      }),
+      UserBadge.findAll({ where: { userId: user.id }, order: [['earnedAt', 'ASC']] }),
+      User.sequelize.query(
+        `SELECT cat.name AS category, COUNT(*) AS cnt, SUM(s.pointsAwarded) AS pts
+         FROM Submissions s
+         JOIN Challenges ch ON s.challengeId = ch.id
+         JOIN Categories cat ON ch.categoryId = cat.id
+         WHERE s.userId = ? AND s.correct = 1
+         GROUP BY cat.name ORDER BY cnt DESC`,
+        { replacements: [user.id], type: 'SELECT' }
+      ),
+    ]);
 
-    const solves = await Submission.findAll({
-      where: { userId: user.id, correct: true },
-      include: [{ model: Challenge, attributes: ['title', 'points', 'difficulty'], include: [{ model: Category, attributes: ['name'] }] }],
-      order: [['createdAt', 'DESC']],
-      limit: 10,
-    });
-
-    const badges = await UserBadge.findAll({ where: { userId: user.id }, order: [['earnedAt', 'ASC']] });
-
-    const categoryStats = await Submission.sequelize.query(`
-      SELECT cat.name AS category, COUNT(*) AS cnt, SUM(s.pointsAwarded) AS pts
-      FROM Submissions s
-      JOIN Challenges ch ON s.challengeId = ch.id
-      JOIN Categories cat ON ch.categoryId = cat.id
-      WHERE s.userId = ? AND s.correct = true
-      GROUP BY cat.name
-    `, { replacements: [user.id] });
+    const rankRow   = rankResult.status === 'fulfilled'   ? rankResult.value[0]   : null;
+    const solveList = solves.status === 'fulfilled'       ? solves.value           : [];
+    const badgeList = badges.status === 'fulfilled'       ? badges.value           : [];
+    const catRows   = categoryResult.status === 'fulfilled' ? categoryResult.value : [];
 
     res.json({
       ...user.toJSON(),
       rank: Number(rankRow?.rank || 0),
-      solveCount: solves.length,
-      recentSolves: solves.map(s => ({
+      solveCount: solveList.length,
+      recentSolves: solveList.map(s => ({
         title: s.Challenge?.title,
         category: s.Challenge?.Category?.name,
         difficulty: s.Challenge?.difficulty,
@@ -1401,8 +1408,8 @@ router.get('/profile/:username', async (req, res) => {
         isFirstSolve: s.isFirstSolve,
         solvedAt: s.createdAt,
       })),
-      badges: badges.map(b => ({ type: b.badgeType, earnedAt: b.earnedAt })),
-      categoryStats: (categoryStats[0] || []).map(r => ({ category: r.category, count: Number(r.cnt), points: Number(r.pts) })),
+      badges: badgeList.map(b => ({ type: b.badgeType, earnedAt: b.earnedAt })),
+      categoryStats: catRows.map(r => ({ category: r.category, count: Number(r.cnt), points: Number(r.pts) })),
     });
   } catch (e) {
     res.status(500).json({ message: 'Failed to fetch public profile', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
