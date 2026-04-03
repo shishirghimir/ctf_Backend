@@ -120,10 +120,12 @@ app.get('/download/:filename', verifyToken, (req, res) => {
 });
 
 // ---------- Basic rate limit for auth & otp ----------
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { message: '❌ Too many attempts, please try again later.' } });
-const otpLimiter  = rateLimit({ windowMs: 60 * 60 * 1000, max: 5,  message: { message: '❌ Too many OTP requests, please try again in an hour.' } });
-app.use('/api/pract/login', authLimiter);
-app.use('/api/pract/send-reset-otp', otpLimiter);
+const authLimiter      = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { message: '❌ Too many attempts, please try again later.' } });
+const otpSendLimiter   = rateLimit({ windowMs: 60 * 60 * 1000, max: 5,  message: { message: '❌ Too many OTP requests, please try again in an hour.' } });
+const otpVerifyLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5,  message: { message: '❌ Too many verification attempts, please request a new OTP.' } });
+app.use('/api/pract/login',            authLimiter);
+app.use('/api/pract/send-reset-otp',   otpSendLimiter);
+app.use('/api/pract/verify-reset-otp', otpVerifyLimiter);
 
 // ---------- Health check ----------
 app.get('/', (_req, res) => {

@@ -1360,9 +1360,14 @@ router.get('/solve-feed', async (req, res) => {
 // -------- Public profile --------
 router.get('/profile/:username', async (req, res) => {
   try {
-    // Block admin accounts from public profiles
+    // Validate username format — only allow alphanumeric + underscore + hyphen (max 50 chars)
+    const rawUsername = req.params.username;
+    if (!rawUsername || !/^[a-zA-Z0-9_\-]{1,50}$/.test(rawUsername)) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    // Block admin accounts from public profiles (both non-existent and admin → same 404)
     const user = await User.findOne({
-      where: { username: req.params.username, isAdmin: false },
+      where: { username: rawUsername, isAdmin: false },
       attributes: ['id', 'username', 'fullName', 'totalPoints', 'country', 'bio', 'website', 'githubUsername', 'twitterUsername', 'createdAt'],
     });
     if (!user) return res.status(404).json({ message: 'User not found' });

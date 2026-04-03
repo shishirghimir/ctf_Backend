@@ -68,10 +68,12 @@ router.get('/verify-admin', verifyToken, requireAdmin, (req, res) => {
 // ✅ Send OTP to Email (5 min expiry)
 router.post('/send-reset-otp', async (req, res) => {
   const { email } = req.body;
+  // Always return the same message regardless of whether the email exists
+  const GENERIC = { message: '✅ If that email is registered, an OTP has been sent.' };
 
   try {
     const user = await User.findOne({ where: { email } });
-    if (!user) return res.status(404).json({ message: '❌ Email not found' });
+    if (!user) return res.json(GENERIC); // Do NOT reveal email existence
 
     const otp = Math.floor(100000 + Math.random() * 900000);
     const otpExpires = new Date(Date.now() + 5 * 60 * 1000);
@@ -80,7 +82,7 @@ router.post('/send-reset-otp', async (req, res) => {
     user.otpExpires = otpExpires;
     await sendResetOtpEmail(user.email, otp);
     await user.save();
-    res.json({ message: '✅ OTP sent to email' });
+    res.json(GENERIC);
 
   } catch (error) {
     console.error('❌ Error sending OTP:', error);
@@ -94,14 +96,16 @@ router.post('/verify-reset-otp', async (req, res) => {
 
   try {
     const user = await User.findOne({ where: { email } });
-    if (!user) return res.status(404).json({ message: '❌ User not found' });
 
-    if (
-      !user.resetOtp ||
-      user.resetOtp.toString() !== otp ||
-      new Date() > user.otpExpires
-    ) {
-      return res.status(400).json({ message: '❌ Invalid or expired OTP' });
+    // Use a single generic error for all failure cases — prevents email + OTP enumeration
+    const INVALID = () => res.status(400).json({ message: '❌ Invalid or expired OTP' });
+
+    if (!user || !user.resetOtp || !user.otpExpires) return INVALID();
+    if (new Date() > user.otpExpires) return INVALID();
+    if (user.resetOtp.toString() !== String(otp)) return INVALID();
+
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ message: '❌ Password must be at least 8 characters' });
     }
 
     user.password = await bcrypt.hash(newPassword, 10);
