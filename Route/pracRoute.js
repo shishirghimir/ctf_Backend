@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
+const { Op } = require('sequelize');
 const upload = require('../middleware/multerConfig');
 const verifyToken = require('../middleware/auth'); // ✅ JWT from cookie
 const { requireAdmin } = require('../middleware/auth');
@@ -20,6 +21,7 @@ const Submission = require('../model/submissionmodel');
 const Tournament = require('../model/tournamentmodel');
 const Team = require('../model/teammodel');
 const Challenge = require('../model/challengemodel');
+const { Category } = require('../model/index');
 // Note: MCQ system removed in favor of CTF routes
 
 // ✅ User Routes
@@ -114,38 +116,66 @@ router.post('/verify-reset-otp', async (req, res) => {
   }
 });
 
-// ✅ Certificate endpoint — returns data needed to render a certificate of participation
+// ✅ Certificate endpoint — team members only, after tournament ends
+// Supports ?tournamentId=X for per-tournament certificates
 router.get('/certificate', verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const user = await User.findByPk(userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Most recent tournament (ended or ongoing)
-    const tournament = await Tournament.findOne({ order: [['endTime', 'DESC']] });
-
-    let teamName = 'Independent';
-    let teamRank = null;
-    if (user.teamId) {
-      const team = await Team.findByPk(user.teamId);
-      if (team) { teamName = team.name; teamRank = team.teamRank; }
+    // Must be in a team to earn a certificate
+    if (!user.teamId) {
+      return res.status(403).json({
+        message: 'Certificates are only awarded to team members. Join or create a team to participate.',
+        requiresTeam: true,
+      });
     }
 
-    const solveCount = await Submission.count({ where: { userId, correct: true } });
-    const certId = `NCTF-${String(userId).padStart(4, '0')}-${new Date().getFullYear()}`;
+    const team = await Team.findByPk(user.teamId);
+
+    // Pick tournament: specific one by query param, or most recent ended one
+    let tournament;
+    if (req.query.tournamentId) {
+      tournament = await Tournament.findByPk(req.query.tournamentId);
+    } else {
+      tournament = await Tournament.findOne({
+        where: { isActive: false },
+        order: [['endTime', 'DESC']],
+      });
+    }
+
+    // Tournament must have ended
+    if (!tournament || tournament.isActive || (tournament.endTime && new Date(tournament.endTime) > new Date())) {
+      return res.status(403).json({
+        message: 'Your certificate will be available once the tournament ends.',
+        tournamentNotEnded: true,
+      });
+    }
+
+    // Count solves within the tournament window (if time bounds exist), else all solves
+    let solveWhere = { userId, correct: true };
+    if (tournament.startTime && tournament.endTime) {
+      solveWhere.createdAt = { [Op.between]: [tournament.startTime, tournament.endTime] };
+    }
+    const solveCount = await Submission.count({ where: solveWhere });
+
+    // Unique cert ID per user + tournament
+    const certId = `NCTF-${String(userId).padStart(4, '0')}-T${String(tournament.id).padStart(3, '0')}`;
 
     res.json({
       success: true,
       data: {
         userName: user.fullName || user.username,
         username: user.username,
-        teamName,
-        teamRank,
+        teamName: team?.name || 'Unknown Team',
+        teamRank: team?.teamRank || null,
         totalPoints: user.totalPoints || 0,
         solvedChallenges: solveCount,
-        tournamentName: tournament?.name || 'Netanix CTF 2026',
-        issuedDate: tournament?.endTime || new Date(),
+        tournamentName: tournament.name || 'Netanix CTF',
+        issuedDate: tournament.endTime,
         certificateId: certId,
+        tournamentId: tournament.id,
       }
     });
   } catch (err) {
@@ -153,15 +183,38 @@ router.get('/certificate', verifyToken, async (req, res) => {
   }
 });
 
-// ✅ Solve history — last 15 correct submissions with challenge info
+// ✅ List ended tournaments the user can get certificates for
+router.get('/my-tournaments', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findByPk(userId);
+    if (!user || !user.teamId) return res.json({ success: true, data: [] });
+
+    const tournaments = await Tournament.findAll({
+      where: { isActive: false, endTime: { [Op.lt]: new Date() } },
+      order: [['endTime', 'DESC']],
+      limit: 10,
+    });
+
+    res.json({ success: true, data: tournaments });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch tournaments', error: err.message });
+  }
+});
+
+// ✅ Solve history — last 30 correct submissions with challenge + category info
 router.get('/solve-history', verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const solves = await Submission.findAll({
       where: { userId, correct: true },
       order: [['createdAt', 'DESC']],
-      limit: 15,
-      include: [{ model: Challenge, attributes: ['title', 'points', 'id'] }]
+      limit: 30,
+      include: [{
+        model: Challenge,
+        attributes: ['title', 'points', 'id'],
+        include: [{ model: Category, attributes: ['name'] }],
+      }],
     });
 
     res.json({
@@ -173,6 +226,7 @@ router.get('/solve-history', verifyToken, async (req, res) => {
         points: s.pointsAwarded || s.Challenge?.points || 0,
         solvedAt: s.createdAt,
         isFirstSolve: s.isFirstSolve,
+        category: s.Challenge?.Category?.name || 'Unknown',
       }))
     });
   } catch (err) {

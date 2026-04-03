@@ -6,7 +6,7 @@ const { upload } = require('../middleware/multerConfig');
 const verifyToken = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/auth');
 
-const { Category, Challenge, Submission, User, Attempt, Notification, UserHint, Team, TeamScore, TeamHint, Tournament } = require('../model/index');
+const { Category, Challenge, Submission, User, Attempt, Notification, UserHint, Team, TeamScore, TeamHint, Tournament, UserBadge, Announcement } = require('../model/index');
 const NotificationService = require('../utils/notificationService');
 
 const router = express.Router();
@@ -699,23 +699,34 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
     let isThirdSolve = false;
 
     if (correct) {
-      pointsAwarded = ch.points;
+      // Dynamic scoring: max(min, initial - decay * solveCount)
+      const basePoints = ch.isDynamic
+        ? Math.max(
+            ch.minimumPoints || 10,
+            (ch.initialPoints || ch.points) - ((ch.decayFactor || 10) * (ch.solveCount || 0))
+          )
+        : ch.points;
+
+      pointsAwarded = basePoints;
       if (!ch.firstSolverId) {
         isFirstSolve = true;
-        pointsAwarded = Math.floor(ch.points * 1.5);
-        await Challenge.update({ firstSolverId: user.id, firstSolvedAt: new Date(), solveCount: 1 }, { where: { id: ch.id } });
+        pointsAwarded = Math.floor(basePoints * 1.5);
+        await Challenge.update({ firstSolverId: user.id, firstSolvedAt: new Date(), solveCount: 1, points: Math.max(ch.minimumPoints || 10, (ch.initialPoints || ch.points) - ((ch.decayFactor || 10) * 1)) }, { where: { id: ch.id } });
       } else if (!ch.secondSolverId) {
         isSecondSolve = true;
-        pointsAwarded = Math.floor(ch.points * 1.25);
+        pointsAwarded = Math.floor(basePoints * 1.25);
         await Challenge.update({ secondSolverId: user.id, secondSolvedAt: new Date() }, { where: { id: ch.id } });
         await Challenge.increment('solveCount', { where: { id: ch.id } });
+        if (ch.isDynamic) await Challenge.update({ points: Math.max(ch.minimumPoints || 10, (ch.initialPoints || ch.points) - ((ch.decayFactor || 10) * ((ch.solveCount || 0) + 1))) }, { where: { id: ch.id } });
       } else if (!ch.thirdSolverId) {
         isThirdSolve = true;
-        pointsAwarded = Math.floor(ch.points * 1.1);
+        pointsAwarded = Math.floor(basePoints * 1.1);
         await Challenge.update({ thirdSolverId: user.id, thirdSolvedAt: new Date() }, { where: { id: ch.id } });
         await Challenge.increment('solveCount', { where: { id: ch.id } });
+        if (ch.isDynamic) await Challenge.update({ points: Math.max(ch.minimumPoints || 10, (ch.initialPoints || ch.points) - ((ch.decayFactor || 10) * ((ch.solveCount || 0) + 1))) }, { where: { id: ch.id } });
       } else {
         await Challenge.increment('solveCount', { where: { id: ch.id } });
+        if (ch.isDynamic) await Challenge.update({ points: Math.max(ch.minimumPoints || 10, (ch.initialPoints || ch.points) - ((ch.decayFactor || 10) * ((ch.solveCount || 0) + 1))) }, { where: { id: ch.id } });
       }
 
       await User.increment('totalPoints', { by: pointsAwarded, where: { id: user.id } });
@@ -734,6 +745,11 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
       isSecondSolve,
       isThirdSolve
     });
+
+    // 🏅 BADGE CHECK (async, non-blocking)
+    if (correct) {
+      setImmediate(() => checkAndAwardBadges(user.id, isFirstSolve));
+    }
 
     // 🩸 SOLO BLOOD NOTIFICATIONS
     if (isFirstSolve || isSecondSolve || isThirdSolve) {
@@ -1235,6 +1251,227 @@ router.get('/admin/users/:id/profile', verifyToken, requireAdmin, async (req, re
   } catch (error) {
     console.error('Admin user profile error:', error);
     res.status(500).json({ message: 'Failed to load user profile' });
+  }
+});
+
+// -------- Badge helper --------
+async function checkAndAwardBadges(userId, isFirstSolve) {
+  try {
+    const solveCount = await Submission.count({ where: { userId, correct: true } });
+    const toCheck = [
+      { type: 'solver_1',  condition: solveCount >= 1  },
+      { type: 'solver_5',  condition: solveCount >= 5  },
+      { type: 'solver_10', condition: solveCount >= 10 },
+      { type: 'solver_25', condition: solveCount >= 25 },
+      { type: 'solver_50', condition: solveCount >= 50 },
+      { type: 'first_blood', condition: isFirstSolve   },
+    ];
+    for (const b of toCheck) {
+      if (b.condition) await UserBadge.findOrCreate({ where: { userId, badgeType: b.type } });
+    }
+
+    // Check rank for top_10 / top_3
+    const [[rankRow]] = await User.sequelize.query(
+      'SELECT COUNT(*)+1 AS rank FROM Users WHERE totalPoints > (SELECT totalPoints FROM Users WHERE id = ?)',
+      { replacements: [userId] }
+    );
+    const rank = Number(rankRow?.rank || 99);
+    if (rank <= 10) await UserBadge.findOrCreate({ where: { userId, badgeType: 'top_10' } });
+    if (rank <= 3)  await UserBadge.findOrCreate({ where: { userId, badgeType: 'top_3'  } });
+
+    // Team player — if user is in a team
+    const user = await User.findByPk(userId, { attributes: ['teamId'] });
+    if (user?.teamId) await UserBadge.findOrCreate({ where: { userId, badgeType: 'team_player' } });
+  } catch (err) {
+    console.error('Badge check error:', err.message);
+  }
+}
+
+// -------- PATCH challenge toggle (isActive only) --------
+router.patch('/challenges/:id/toggle', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const ch = await Challenge.findByPk(req.params.id);
+    if (!ch) return res.status(404).json({ message: 'Challenge not found' });
+    ch.isActive = !ch.isActive;
+    await ch.save();
+    res.json({ id: ch.id, isActive: ch.isActive, message: `Challenge ${ch.isActive ? 'activated' : 'deactivated'}` });
+  } catch (e) {
+    res.status(500).json({ message: 'Failed to toggle challenge', error: e.message });
+  }
+});
+
+// -------- PATCH challenge dynamic scoring --------
+router.patch('/challenges/:id/dynamic', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { isDynamic, initialPoints, minimumPoints, decayFactor } = req.body;
+    const ch = await Challenge.findByPk(req.params.id);
+    if (!ch) return res.status(404).json({ message: 'Challenge not found' });
+    if (isDynamic !== undefined) ch.isDynamic = Boolean(isDynamic);
+    if (initialPoints !== undefined) { const v = Math.max(1, Math.min(100000, Number(initialPoints) || 0)); ch.initialPoints = v; ch.points = v; }
+    if (minimumPoints !== undefined) ch.minimumPoints = Math.max(1, Math.min(10000, Number(minimumPoints) || 1));
+    if (decayFactor !== undefined)   ch.decayFactor   = Math.max(0, Math.min(1000, Number(decayFactor) || 0));
+    await ch.save();
+    res.json(ch);
+  } catch (e) {
+    res.status(500).json({ message: 'Failed to update dynamic scoring', error: e.message });
+  }
+});
+
+// -------- User badges --------
+router.get('/badges', verifyToken, async (req, res) => {
+  try {
+    const badges = await UserBadge.findAll({
+      where: { userId: req.user.id },
+      order: [['earnedAt', 'ASC']],
+    });
+    res.json({ success: true, data: badges });
+  } catch (e) {
+    res.status(500).json({ message: 'Failed to fetch badges', error: e.message });
+  }
+});
+
+// -------- Solve feed (public — recent correct solves) --------
+router.get('/solve-feed', async (req, res) => {
+  try {
+    const solves = await Submission.findAll({
+      where: { correct: true },
+      order: [['createdAt', 'DESC']],
+      limit: 25,
+      include: [
+        { model: User,      attributes: ['username'] },
+        { model: Challenge, attributes: ['title', 'points', 'difficulty'], include: [{ model: Category, attributes: ['name'] }] },
+      ],
+    });
+    res.json(solves.map(s => ({
+      id: s.id,
+      username: s.User?.username || 'unknown',
+      challengeTitle: s.Challenge?.title || '?',
+      category: s.Challenge?.Category?.name || '?',
+      difficulty: s.Challenge?.difficulty || 'Medium',
+      points: s.pointsAwarded || s.Challenge?.points || 0,
+      isFirstSolve: s.isFirstSolve,
+      solvedAt: s.createdAt,
+    })));
+  } catch (e) {
+    res.status(500).json({ message: 'Failed to fetch solve feed', error: e.message });
+  }
+});
+
+// -------- Public profile --------
+router.get('/profile/:username', async (req, res) => {
+  try {
+    const user = await User.findOne({
+      where: { username: req.params.username },
+      attributes: ['id', 'username', 'fullName', 'totalPoints', 'country', 'bio', 'website', 'githubUsername', 'twitterUsername', 'createdAt'],
+    });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const [[rankRow]] = await User.sequelize.query(
+      'SELECT COUNT(*)+1 AS rank FROM Users WHERE totalPoints > (SELECT totalPoints FROM Users WHERE id = ?)',
+      { replacements: [user.id] }
+    );
+
+    const solves = await Submission.findAll({
+      where: { userId: user.id, correct: true },
+      include: [{ model: Challenge, attributes: ['title', 'points', 'difficulty'], include: [{ model: Category, attributes: ['name'] }] }],
+      order: [['createdAt', 'DESC']],
+      limit: 10,
+    });
+
+    const badges = await UserBadge.findAll({ where: { userId: user.id }, order: [['earnedAt', 'ASC']] });
+
+    const categoryStats = await Submission.sequelize.query(`
+      SELECT cat.name AS category, COUNT(*) AS cnt, SUM(s.pointsAwarded) AS pts
+      FROM Submissions s
+      JOIN Challenges ch ON s.challengeId = ch.id
+      JOIN Categories cat ON ch.categoryId = cat.id
+      WHERE s.userId = ? AND s.correct = true
+      GROUP BY cat.name
+    `, { replacements: [user.id] });
+
+    res.json({
+      ...user.toJSON(),
+      rank: Number(rankRow?.rank || 0),
+      solveCount: solves.length,
+      recentSolves: solves.map(s => ({
+        title: s.Challenge?.title,
+        category: s.Challenge?.Category?.name,
+        difficulty: s.Challenge?.difficulty,
+        points: s.pointsAwarded,
+        isFirstSolve: s.isFirstSolve,
+        solvedAt: s.createdAt,
+      })),
+      badges: badges.map(b => ({ type: b.badgeType, earnedAt: b.earnedAt })),
+      categoryStats: (categoryStats[0] || []).map(r => ({ category: r.category, count: Number(r.cnt), points: Number(r.pts) })),
+    });
+  } catch (e) {
+    res.status(500).json({ message: 'Failed to fetch public profile', error: e.message });
+  }
+});
+
+// -------- Announcements --------
+router.post('/admin/announcements', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { title, message, type, expiresAt } = req.body;
+    if (!title || !message) return res.status(400).json({ message: 'title and message required' });
+    const safeType = ['info', 'warning', 'success', 'danger'].includes(type) ? type : 'info';
+    const ann = await Announcement.create({
+      title: sanitizeInput(title),
+      message: sanitizeInput(message),
+      type: safeType,
+      isActive: true,
+      createdBy: req.user.id,
+      expiresAt: expiresAt ? new Date(expiresAt) : null,
+    });
+    res.status(201).json(ann);
+  } catch (e) {
+    res.status(500).json({ message: 'Failed to create announcement', error: e.message });
+  }
+});
+
+router.get('/announcements', async (req, res) => {
+  try {
+    const now = new Date();
+    const where = { isActive: true };
+    const announcements = await Announcement.findAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      limit: 5,
+    });
+    // Filter expired ones
+    const active = announcements.filter(a => !a.expiresAt || new Date(a.expiresAt) > now);
+    res.json(active);
+  } catch (e) {
+    res.status(500).json({ message: 'Failed to fetch announcements', error: e.message });
+  }
+});
+
+router.delete('/admin/announcements/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const ann = await Announcement.findByPk(req.params.id);
+    if (!ann) return res.status(404).json({ message: 'Not found' });
+    ann.isActive = false;
+    await ann.save();
+    res.json({ message: 'Announcement dismissed' });
+  } catch (e) {
+    res.status(500).json({ message: 'Failed to dismiss announcement', error: e.message });
+  }
+});
+
+// -------- User category stats --------
+router.get('/user/category-stats', verifyToken, async (req, res) => {
+  try {
+    const [rows] = await Submission.sequelize.query(`
+      SELECT cat.name AS category, COUNT(*) AS cnt, SUM(s.pointsAwarded) AS pts
+      FROM Submissions s
+      JOIN Challenges ch ON s.challengeId = ch.id
+      JOIN Categories cat ON ch.categoryId = cat.id
+      WHERE s.userId = ? AND s.correct = true
+      GROUP BY cat.name
+    `, { replacements: [req.user.id] });
+    res.json(rows.map(r => ({ category: r.category, count: Number(r.cnt), points: Number(r.pts || 0) })));
+  } catch (e) {
+    res.status(500).json({ message: 'Failed to fetch category stats', error: e.message });
   }
 });
 

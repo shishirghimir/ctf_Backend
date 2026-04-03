@@ -454,6 +454,55 @@ const connectDB = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 
+    // UserBadges table
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS UserBadges (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        userId INT NOT NULL,
+        badgeType ENUM(
+          'solver_1','solver_5','solver_10','solver_25','solver_50',
+          'first_blood','top_10','top_3',
+          'web_master','crypto_master','pwn_master','forensics_master','misc_master',
+          'speedrunner','team_player','veteran'
+        ) NOT NULL,
+        earnedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES Users(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_user_badge (userId, badgeType),
+        INDEX idx_userId (userId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // Announcements table
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS Announcements (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(200) NOT NULL,
+        message TEXT NOT NULL,
+        type ENUM('info','warning','success','danger') DEFAULT 'info',
+        isActive BOOLEAN DEFAULT TRUE,
+        createdBy INT NOT NULL,
+        expiresAt DATETIME,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (createdBy) REFERENCES Users(id) ON DELETE CASCADE,
+        INDEX idx_isActive (isActive),
+        INDEX idx_createdAt (createdAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // Dynamic scoring columns for Challenges
+    const dynamicScoringColumns = [
+      'ALTER TABLE Challenges ADD COLUMN isDynamic BOOLEAN DEFAULT FALSE',
+      'ALTER TABLE Challenges ADD COLUMN initialPoints INT',
+      'ALTER TABLE Challenges ADD COLUMN minimumPoints INT DEFAULT 10',
+      'ALTER TABLE Challenges ADD COLUMN decayFactor INT DEFAULT 10',
+    ];
+    for (const q of dynamicScoringColumns) {
+      try { await sequelize.query(q); } catch (_) {}
+    }
+
     console.log('✅ Database tables created successfully');
   } catch (error) {
     console.error('❌ Database connection failed:', error.message);

@@ -14,6 +14,8 @@ const TeamHint = require('./teamhintmodel');
 const UserHint = require('./userhintmodel');
 const RegistrationChallenge = require('./registrationchallengemodel');
 const Tournament = require('./tournamentmodel');
+const UserBadge = require('./badgemodel');
+const Announcement = require('./announcementmodel');
 
 function initializeModels() {
   // User -> Submission (1:N)
@@ -108,6 +110,14 @@ function initializeModels() {
   // User -> Tournament (1:N) - who created the tournament
   User.hasMany(Tournament, { foreignKey: 'createdBy', onDelete: 'CASCADE' });
   Tournament.belongsTo(User, { as: 'Creator', foreignKey: 'createdBy' });
+
+  // User -> UserBadge (1:N)
+  User.hasMany(UserBadge, { foreignKey: 'userId', onDelete: 'CASCADE' });
+  UserBadge.belongsTo(User, { foreignKey: 'userId' });
+
+  // User -> Announcement (1:N) - who created the announcement
+  User.hasMany(Announcement, { foreignKey: 'createdBy', onDelete: 'CASCADE' });
+  Announcement.belongsTo(User, { as: 'Creator', foreignKey: 'createdBy' });
 }
 
 module.exports = {
@@ -124,5 +134,7 @@ module.exports = {
   UserHint,
   RegistrationChallenge,
   Tournament,
+  UserBadge,
+  Announcement,
   initializeModels,
 };
