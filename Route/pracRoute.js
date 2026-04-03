@@ -16,6 +16,10 @@ const {
 } = require('../Controller/praccontroller');
 
 const User = require('../model/usermodel');
+const Submission = require('../model/submissionmodel');
+const Tournament = require('../model/tournamentmodel');
+const Team = require('../model/teammodel');
+const Challenge = require('../model/challengemodel');
 // Note: MCQ system removed in favor of CTF routes
 
 // ✅ User Routes
@@ -107,6 +111,72 @@ router.post('/verify-reset-otp', async (req, res) => {
   } catch (error) {
     console.error('❌ Reset error:', error);
     res.status(500).json({ message: '❌ Failed to reset password', error: error.message });
+  }
+});
+
+// ✅ Certificate endpoint — returns data needed to render a certificate of participation
+router.get('/certificate', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Most recent tournament (ended or ongoing)
+    const tournament = await Tournament.findOne({ order: [['endTime', 'DESC']] });
+
+    let teamName = 'Independent';
+    let teamRank = null;
+    if (user.teamId) {
+      const team = await Team.findByPk(user.teamId);
+      if (team) { teamName = team.name; teamRank = team.teamRank; }
+    }
+
+    const solveCount = await Submission.count({ where: { userId, correct: true } });
+    const certId = `NCTF-${String(userId).padStart(4, '0')}-${new Date().getFullYear()}`;
+
+    res.json({
+      success: true,
+      data: {
+        userName: user.fullName || user.username,
+        username: user.username,
+        teamName,
+        teamRank,
+        totalPoints: user.totalPoints || 0,
+        solvedChallenges: solveCount,
+        tournamentName: tournament?.name || 'Netanix CTF 2026',
+        issuedDate: tournament?.endTime || new Date(),
+        certificateId: certId,
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to generate certificate', error: err.message });
+  }
+});
+
+// ✅ Solve history — last 15 correct submissions with challenge info
+router.get('/solve-history', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const solves = await Submission.findAll({
+      where: { userId, correct: true },
+      order: [['createdAt', 'DESC']],
+      limit: 15,
+      include: [{ model: Challenge, attributes: ['title', 'points', 'id'] }]
+    });
+
+    res.json({
+      success: true,
+      data: solves.map(s => ({
+        id: s.id,
+        challengeId: s.challengeId,
+        title: s.Challenge?.title || 'Unknown Challenge',
+        points: s.pointsAwarded || s.Challenge?.points || 0,
+        solvedAt: s.createdAt,
+        isFirstSolve: s.isFirstSolve,
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch solve history', error: err.message });
   }
 });
 
