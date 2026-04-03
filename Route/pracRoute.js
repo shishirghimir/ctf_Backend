@@ -84,7 +84,7 @@ router.post('/send-reset-otp', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error sending OTP:', error);
-    res.status(500).json({ message: '❌ Failed to send OTP', error: error.message });
+    res.status(500).json({ message: '❌ Failed to send OTP', ...(process.env.NODE_ENV === "development" && { error: error.message }) });
   }
 });
 
@@ -112,7 +112,7 @@ router.post('/verify-reset-otp', async (req, res) => {
     res.json({ message: '✅ Password successfully reset' });
   } catch (error) {
     console.error('❌ Reset error:', error);
-    res.status(500).json({ message: '❌ Failed to reset password', error: error.message });
+    res.status(500).json({ message: '❌ Failed to reset password', ...(process.env.NODE_ENV === "development" && { error: error.message }) });
   }
 });
 
@@ -179,7 +179,7 @@ router.get('/certificate', verifyToken, async (req, res) => {
       }
     });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to generate certificate', error: err.message });
+    res.status(500).json({ message: 'Failed to generate certificate', ...(process.env.NODE_ENV === "development" && { error: err.message }) });
   }
 });
 
@@ -198,7 +198,7 @@ router.get('/my-tournaments', verifyToken, async (req, res) => {
 
     res.json({ success: true, data: tournaments });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch tournaments', error: err.message });
+    res.status(500).json({ message: 'Failed to fetch tournaments', ...(process.env.NODE_ENV === "development" && { error: err.message }) });
   }
 });
 
@@ -230,7 +230,7 @@ router.get('/solve-history', verifyToken, async (req, res) => {
       }))
     });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch solve history', error: err.message });
+    res.status(500).json({ message: 'Failed to fetch solve history', ...(process.env.NODE_ENV === "development" && { error: err.message }) });
   }
 });
 

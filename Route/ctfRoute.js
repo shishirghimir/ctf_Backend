@@ -175,7 +175,7 @@ router.get('/admin/stats', verifyToken, requireAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error('Admin stats error:', error);
-    res.status(500).json({ message: 'Failed to fetch admin stats', error: error.message });
+    res.status(500).json({ message: 'Failed to fetch admin stats', ...(process.env.NODE_ENV === "development" && { error: error.message }) });
   }
 });
 
@@ -197,7 +197,7 @@ router.post('/categories', verifyToken, requireAdmin, async (req, res) => {
     });
     res.status(201).json(cat);
   } catch (e) {
-    res.status(500).json({ message: 'Failed to create category', error: e.message });
+    res.status(500).json({ message: 'Failed to create category', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -221,7 +221,7 @@ router.get('/categories', async (_req, res) => {
     res.json(categoriesWithCount);
   } catch (e) {
     console.error('Categories error:', e);
-    res.status(500).json({ message: 'Failed to load categories', error: e.message });
+    res.status(500).json({ message: 'Failed to load categories', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -237,7 +237,7 @@ router.put('/categories/:id', verifyToken, requireAdmin, async (req, res) => {
     await cat.save();
     res.json(cat);
   } catch (e) {
-    res.status(500).json({ message: 'Failed to update category', error: e.message });
+    res.status(500).json({ message: 'Failed to update category', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -252,7 +252,7 @@ router.delete('/categories/:id', verifyToken, requireAdmin, async (req, res) => 
     if (!deleted) return res.status(404).json({ message: 'Not found' });
     res.json({ message: 'Deleted' });
   } catch (e) {
-    res.status(500).json({ message: 'Failed to delete category', error: e.message });
+    res.status(500).json({ message: 'Failed to delete category', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -310,7 +310,7 @@ router.post('/challenges', verifyToken, requireAdmin, upload.single('file'), asy
 
     res.status(201).json(challenge);
   } catch (e) {
-    res.status(500).json({ message: 'Failed to create challenge', error: e.message });
+    res.status(500).json({ message: 'Failed to create challenge', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -353,7 +353,7 @@ router.get('/admin/challenges', verifyToken, requireAdmin, async (req, res) => {
       .json(list);
   } catch (e) {
     console.error('Admin challenges error:', e);
-    res.status(500).json({ message: 'Failed to load admin challenges', error: e.message });
+    res.status(500).json({ message: 'Failed to load admin challenges', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -439,7 +439,7 @@ router.get('/challenges', async (req, res) => {
       .json(enrichedList);
   } catch (e) {
     console.error('Challenges error:', e);
-    res.status(500).json({ message: 'Failed to load challenges', error: e.message });
+    res.status(500).json({ message: 'Failed to load challenges', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -479,7 +479,7 @@ router.get('/challenges/:id', async (req, res) => {
 
     res.json(challengeData);
   } catch (e) {
-    res.status(500).json({ message: 'Failed to fetch challenge', error: e.message });
+    res.status(500).json({ message: 'Failed to fetch challenge', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -511,7 +511,7 @@ router.put('/challenges/:id', verifyToken, requireAdmin, upload.single('file'), 
     await ch.save();
     res.json(ch);
   } catch (e) {
-    res.status(500).json({ message: 'Failed to update challenge', error: e.message });
+    res.status(500).json({ message: 'Failed to update challenge', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -525,7 +525,7 @@ router.delete('/challenges/:id', verifyToken, requireAdmin, async (req, res) => 
     if (!updated[0]) return res.status(404).json({ message: 'Not found' });
     res.json({ message: 'Challenge deactivated' });
   } catch (e) {
-    res.status(500).json({ message: 'Failed to delete challenge', error: e.message });
+    res.status(500).json({ message: 'Failed to delete challenge', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -790,7 +790,7 @@ router.post('/challenges/:id/submit', verifyToken, async (req, res) => {
     });
   } catch (e) {
     console.error('Submission error:', e);
-    res.status(500).json({ message: 'Submission failed', error: e.message });
+    res.status(500).json({ message: 'Submission failed', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -825,7 +825,7 @@ router.get('/user/solved', verifyToken, async (req, res) => {
 
     res.json(solved);
   } catch (e) {
-    res.status(500).json({ message: 'Failed to get solved challenges', error: e.message });
+    res.status(500).json({ message: 'Failed to get solved challenges', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -882,7 +882,7 @@ router.get('/scoreboard', async (req, res) => {
     res.json(leaderboard);
   } catch (e) {
     console.error('Scoreboard error:', e);
-    res.status(500).json({ message: 'Failed to get scoreboard', error: e.message });
+    res.status(500).json({ message: 'Failed to get scoreboard', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -926,7 +926,7 @@ router.get('/challenges/:id/stats', verifyToken, requireAdmin, async (req, res) 
       }))
     });
   } catch (e) {
-    res.status(500).json({ message: 'Failed to get challenge stats', error: e.message });
+    res.status(500).json({ message: 'Failed to get challenge stats', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -968,7 +968,7 @@ router.get('/user/profile', verifyToken, async (req, res) => {
       solveStats: solveStats[0] || { totalSolves: 0, firstSolves: 0 }
     });
   } catch (e) {
-    res.status(500).json({ message: 'Failed to get profile', error: e.message });
+    res.status(500).json({ message: 'Failed to get profile', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -1002,7 +1002,7 @@ router.put('/user/profile', verifyToken, async (req, res) => {
     
     res.json(updatedUser);
   } catch (e) {
-    res.status(500).json({ message: 'Failed to update profile', error: e.message });
+    res.status(500).json({ message: 'Failed to update profile', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -1039,7 +1039,7 @@ router.get('/admin/audit', verifyToken, requireAdmin, async (req, res) => {
 
     res.json(formattedLog);
   } catch (e) {
-    res.status(500).json({ message: 'Failed to get audit log', error: e.message });
+    res.status(500).json({ message: 'Failed to get audit log', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -1054,7 +1054,7 @@ router.get('/notifications', verifyToken, async (req, res) => {
     );
     res.json(notifications);
   } catch (e) {
-    res.status(500).json({ message: 'Failed to get notifications', error: e.message });
+    res.status(500).json({ message: 'Failed to get notifications', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -1063,7 +1063,7 @@ router.get('/notifications/unread-count', verifyToken, async (req, res) => {
     const count = await NotificationService.getUnreadCount(req.user.id);
     res.json({ count });
   } catch (e) {
-    res.status(500).json({ message: 'Failed to get unread count', error: e.message });
+    res.status(500).json({ message: 'Failed to get unread count', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -1076,7 +1076,7 @@ router.put('/notifications/:id/read', verifyToken, async (req, res) => {
       res.status(404).json({ message: 'Notification not found' });
     }
   } catch (e) {
-    res.status(500).json({ message: 'Failed to mark notification as read', error: e.message });
+    res.status(500).json({ message: 'Failed to mark notification as read', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -1085,7 +1085,7 @@ router.put('/notifications/read-all', verifyToken, async (req, res) => {
     const updatedCount = await NotificationService.markAllAsRead(req.user.id);
     res.json({ message: `${updatedCount} notifications marked as read` });
   } catch (e) {
-    res.status(500).json({ message: 'Failed to mark all notifications as read', error: e.message });
+    res.status(500).json({ message: 'Failed to mark all notifications as read', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -1296,7 +1296,7 @@ router.patch('/challenges/:id/toggle', verifyToken, requireAdmin, async (req, re
     await ch.save();
     res.json({ id: ch.id, isActive: ch.isActive, message: `Challenge ${ch.isActive ? 'activated' : 'deactivated'}` });
   } catch (e) {
-    res.status(500).json({ message: 'Failed to toggle challenge', error: e.message });
+    res.status(500).json({ message: 'Failed to toggle challenge', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -1313,7 +1313,7 @@ router.patch('/challenges/:id/dynamic', verifyToken, requireAdmin, async (req, r
     await ch.save();
     res.json(ch);
   } catch (e) {
-    res.status(500).json({ message: 'Failed to update dynamic scoring', error: e.message });
+    res.status(500).json({ message: 'Failed to update dynamic scoring', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -1326,7 +1326,7 @@ router.get('/badges', verifyToken, async (req, res) => {
     });
     res.json({ success: true, data: badges });
   } catch (e) {
-    res.status(500).json({ message: 'Failed to fetch badges', error: e.message });
+    res.status(500).json({ message: 'Failed to fetch badges', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -1353,7 +1353,7 @@ router.get('/solve-feed', async (req, res) => {
       solvedAt: s.createdAt,
     })));
   } catch (e) {
-    res.status(500).json({ message: 'Failed to fetch solve feed', error: e.message });
+    res.status(500).json({ message: 'Failed to fetch solve feed', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -1405,7 +1405,7 @@ router.get('/profile/:username', async (req, res) => {
       categoryStats: (categoryStats[0] || []).map(r => ({ category: r.category, count: Number(r.cnt), points: Number(r.pts) })),
     });
   } catch (e) {
-    res.status(500).json({ message: 'Failed to fetch public profile', error: e.message });
+    res.status(500).json({ message: 'Failed to fetch public profile', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -1425,7 +1425,7 @@ router.post('/admin/announcements', verifyToken, requireAdmin, async (req, res) 
     });
     res.status(201).json(ann);
   } catch (e) {
-    res.status(500).json({ message: 'Failed to create announcement', error: e.message });
+    res.status(500).json({ message: 'Failed to create announcement', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -1442,7 +1442,7 @@ router.get('/announcements', async (req, res) => {
     const active = announcements.filter(a => !a.expiresAt || new Date(a.expiresAt) > now);
     res.json(active);
   } catch (e) {
-    res.status(500).json({ message: 'Failed to fetch announcements', error: e.message });
+    res.status(500).json({ message: 'Failed to fetch announcements', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -1454,7 +1454,7 @@ router.delete('/admin/announcements/:id', verifyToken, requireAdmin, async (req,
     await ann.save();
     res.json({ message: 'Announcement dismissed' });
   } catch (e) {
-    res.status(500).json({ message: 'Failed to dismiss announcement', error: e.message });
+    res.status(500).json({ message: 'Failed to dismiss announcement', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 
@@ -1471,7 +1471,7 @@ router.get('/user/category-stats', verifyToken, async (req, res) => {
     `, { replacements: [req.user.id] });
     res.json(rows.map(r => ({ category: r.category, count: Number(r.cnt), points: Number(r.pts || 0) })));
   } catch (e) {
-    res.status(500).json({ message: 'Failed to fetch category stats', error: e.message });
+    res.status(500).json({ message: 'Failed to fetch category stats', ...(process.env.NODE_ENV === "development" && { error: e.message }) });
   }
 });
 

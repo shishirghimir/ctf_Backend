@@ -20,7 +20,7 @@ const getAllUsers = async (req, res) => {
     });
     res.status(200).json(users);
   } catch (error) {
-    res.status(500).json({ message: "❌ Failed to fetch users", error: error.message });
+    res.status(500).json({ message: "❌ Failed to fetch users", ...(process.env.NODE_ENV === "development" && { error: error.message }) });
   }
 };
 
@@ -70,7 +70,7 @@ const createUsers = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(400).json({ message: '❌ Failed to create user', error: error.message });
+    res.status(400).json({ message: '❌ Failed to create user', ...(process.env.NODE_ENV === "development" && { error: error.message }) });
   }
 };
 
@@ -117,7 +117,7 @@ const updateUsers = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: "❌ Server error while updating user", error: error.message });
+    res.status(500).json({ message: "❌ Server error while updating user", ...(process.env.NODE_ENV === "development" && { error: error.message }) });
   }
 };
 
@@ -133,7 +133,7 @@ const deleteUsers = async (req, res) => {
 
     return res.status(404).json({ message: `❌ No user found with ID ${id}.` });
   } catch (error) {
-    res.status(500).json({ message: "❌ Server error while deleting user", error: error.message });
+    res.status(500).json({ message: "❌ Server error while deleting user", ...(process.env.NODE_ENV === "development" && { error: error.message }) });
   }
 };
 
@@ -143,10 +143,8 @@ const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ where: { email } });
-    if (!user) return res.status(404).json({ message: '❌ User not found' });
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: '❌ Invalid credentials' });
+    const isMatch = user && await bcrypt.compare(password, user.password);
+    if (!user || !isMatch) return res.status(401).json({ message: '❌ Invalid email or password' });
 
     user.lastLogin = new Date();
     await user.save();
@@ -185,7 +183,7 @@ const loginUser = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: '❌ Server error during login', error: error.message });
+    res.status(500).json({ message: '❌ Server error during login', ...(process.env.NODE_ENV === "development" && { error: error.message }) });
   }
 };
 
