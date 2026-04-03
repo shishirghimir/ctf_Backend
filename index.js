@@ -21,6 +21,7 @@ const { initializeModels } = require('./model/index');
 
 // Multer config (uses Railway Volume if UPLOAD_DIR is set)
 const { upload, UPLOAD_DIR } = require('./middleware/multerConfig');
+const verifyToken = require('./middleware/auth');
 
 // ---------- Compression (reduces payload by ~70%) ----------
 app.use(compression());
@@ -43,6 +44,8 @@ app.use((req, res, next) => {
 
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
+const sanitizeBody = require('./middleware/sanitize');
+app.use(sanitizeBody); // Strip XSS from all request bodies globally
 
 // ---------- CORS with credentials ----------
 const allowedOrigins = [
@@ -94,23 +97,23 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// ---------- Safe download route ----------
-app.get('/download/:filename', (req, res) => {
+// ---------- Safe download route (login required) ----------
+app.get('/download/:filename', verifyToken, (req, res) => {
   try {
-    const filePath = path.join(UPLOAD_DIR, req.params.filename);
+    // Prevent path traversal — strip any directory components
+    const safeFilename = path.basename(req.params.filename);
+    const filePath = path.join(UPLOAD_DIR, safeFilename);
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ ok: false, error: 'File not found' });
     }
 
-    res.download(filePath, (err) => {
-      if (err) {
-        console.error('Download error:', err);
+    res.download(filePath, safeFilename, (err) => {
+      if (err && !res.headersSent) {
         res.status(500).json({ ok: false, error: 'Failed to download' });
       }
     });
   } catch (e) {
-    console.error('Download error:', e);
     res.status(500).json({ ok: false, error: e.message });
   }
 });

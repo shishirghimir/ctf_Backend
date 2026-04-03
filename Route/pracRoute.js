@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const axios = require('axios');
 const bcrypt = require('bcryptjs');
 const upload = require('../middleware/multerConfig');
 const verifyToken = require('../middleware/auth'); // ✅ JWT from cookie
@@ -59,25 +58,6 @@ router.get('/verify-admin', verifyToken, requireAdmin, (req, res) => {
   res.json({ verified: true });
 });
 
-// ✅ Verify reCAPTCHA token (use env secret)
-router.post('/verify-recaptcha', async (req, res) => {
-  const { token } = req.body;
-  const secretKey = process.env.RECAPTCHA_SECRET || '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe'; // default to test secret
-
-  try {
-    const response = await axios.post(
-      `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${token}`
-    );
-
-    if (!response.data.success) {
-      return res.status(403).json({ message: '❌ Captcha verification failed' });
-    }
-
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ message: '❌ Captcha error', error: error.message });
-  }
-});
 
 // ✅ Send OTP to Email (5 min expiry)
 router.post('/send-reset-otp', async (req, res) => {
